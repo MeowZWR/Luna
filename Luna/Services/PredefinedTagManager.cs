@@ -112,7 +112,7 @@ public abstract class PredefinedTagManager<TProvider, TObj>(BaseSaveService<TPro
     public void DrawToggleButton()
     {
         using var color = ImGuiColor.Button.Push(Im.Style[ImGuiColor.ButtonActive], IsListOpen);
-        if (ImEx.Icon.Button(LunaStyle.TagsMarker, "Add Predefined Tags..."u8))
+        if (ImEx.Icon.Button(LunaStyle.TagsMarker, "添加预定义标签..."u8))
             IsListOpen = !IsListOpen;
     }
 
@@ -159,7 +159,7 @@ public abstract class PredefinedTagManager<TProvider, TObj>(BaseSaveService<TPro
             return false;
 
         var ret = false;
-        Im.Text("Predefined Tags"u8);
+        Im.Text("预定义标签"u8);
         Im.Separator();
         _addButtonColor    = AddButtonColor;
         _removeButtonColor = RemoveButtonColor;
@@ -196,7 +196,7 @@ public abstract class PredefinedTagManager<TProvider, TObj>(BaseSaveService<TPro
         if (!IsListOpen)
             return false;
 
-        Im.Text("Predefined Tags"u8);
+        Im.Text("预定义标签"u8);
         Im.Separator();
 
         _addButtonColor    = AddButtonColor;
@@ -265,7 +265,7 @@ public abstract class PredefinedTagManager<TProvider, TObj>(BaseSaveService<TPro
         if (!IsListOpen)
             return;
 
-        Im.Text("Predefined Tags"u8);
+        Im.Text("预定义标签"u8);
 
         using var color = new Im.ColorDisposable();
         var       cache = CacheManager.Instance.GetOrCreateCache(Im.Id.Current, () => new Cache());
@@ -364,7 +364,7 @@ public abstract class PredefinedTagManager<TProvider, TObj>(BaseSaveService<TPro
         }
 
         if (inOther)
-            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, "This tag is already present in the other set of tags."u8);
+            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, "此标签已存在于其他标签集中。"u8);
 
         return ret;
     }

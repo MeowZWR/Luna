@@ -58,7 +58,7 @@ public static class TagButtons
                 if (editable)
                 {
                     var delete = Im.Io.KeyControl && Im.Item.RightClicked();
-                    Im.Tooltip.OnHover("Hold control and right-click to delete."u8);
+                    Im.Tooltip.OnHover("按住 Ctrl 键并右键点击以删除。"u8);
                     if (delete)
                     {
                         editedTag = string.Empty;
@@ -83,7 +83,7 @@ public static class TagButtons
         else
         {
             SetPos(Im.Style.FrameHeight, x, rightEndOffset);
-            if (!ImEx.Icon.Button(LunaStyle.AddObjectIcon, "Add Tag..."u8))
+            if (!ImEx.Icon.Button(LunaStyle.AddObjectIcon, "添加标签..."u8))
                 return ret;
 
             _currentButton = Im.Id.Current;

@@ -45,10 +45,10 @@ public interface ISortMode : IEquatable<ISortMode>
     private struct FoldersFirstT : ISortMode
     {
         public ReadOnlySpan<byte> Name
-            => "Folders First"u8;
+            => "折叠组优先"u8;
 
         public ReadOnlySpan<byte> Description
-            => "In each folder, sort all subfolders lexicographically, then sort all data nodes lexicographically."u8;
+            => "在每个折叠组中，按字典顺序排序所有子折叠组，然后按字典顺序排序所有数据节点。"u8;
 
         public IEnumerable<IFileSystemNode> GetChildren(IFileSystemFolder folder)
             => folder.GetSubFolders().Cast<IFileSystemNode>().Concat(folder.GetLeaves());
@@ -57,10 +57,10 @@ public interface ISortMode : IEquatable<ISortMode>
     private struct LexicographicalT : ISortMode
     {
         public ReadOnlySpan<byte> Name
-            => "Lexicographical"u8;
+            => "字典顺序"u8;
 
         public ReadOnlySpan<byte> Description
-            => "In each folder, sort all children lexicographically."u8;
+            => "在每个折叠组中，按字典顺序排序所有子折叠组。"u8;
 
         public IEnumerable<IFileSystemNode> GetChildren(IFileSystemFolder folder)
             => folder.Children;
@@ -69,10 +69,10 @@ public interface ISortMode : IEquatable<ISortMode>
     private struct InverseFoldersFirstT : ISortMode
     {
         public ReadOnlySpan<byte> Name
-            => "Folders First (Inverted)"u8;
+            => "折叠组优先 (反转)"u8;
 
         public ReadOnlySpan<byte> Description
-            => "In each folder, sort all subfolders in inverse lexicographical order, then sort all leaves in inverse lexicographical order."u8;
+            => "在每个折叠组中，按反字典顺序排序所有子折叠组，然后按反字典顺序排序所有数据节点。"u8;
 
         public IEnumerable<IFileSystemNode> GetChildren(IFileSystemFolder folder)
             => folder.GetSubFolders().Cast<IFileSystemNode>().Reverse().Concat(folder.GetLeaves().Reverse());
@@ -81,10 +81,10 @@ public interface ISortMode : IEquatable<ISortMode>
     public struct InverseLexicographicalT : ISortMode
     {
         public ReadOnlySpan<byte> Name
-            => "Lexicographical (Inverted)"u8;
+            => "字典顺序 (反转)"u8;
 
         public ReadOnlySpan<byte> Description
-            => "In each folder, sort all children in inverse lexicographical order."u8;
+            => "在每个折叠组中，按反字典顺序排序所有子折叠组。"u8;
 
         public IEnumerable<IFileSystemNode> GetChildren(IFileSystemFolder folder)
             => folder.Children.Reverse();
@@ -93,10 +93,10 @@ public interface ISortMode : IEquatable<ISortMode>
     public struct FoldersLastT : ISortMode
     {
         public ReadOnlySpan<byte> Name
-            => "Folders Last"u8;
+            => "折叠组最后"u8;
 
         public ReadOnlySpan<byte> Description
-            => "In each folder, sort all leaves lexicographically, then sort all subfolders lexicographically."u8;
+            => "在每个折叠组中，按字典顺序排序所有数据节点，然后按字典顺序排序所有子折叠组。"u8;
 
         public IEnumerable<IFileSystemNode> GetChildren(IFileSystemFolder folder)
             => folder.GetLeaves().Cast<IFileSystemNode>().Concat(folder.GetSubFolders());
@@ -105,10 +105,10 @@ public interface ISortMode : IEquatable<ISortMode>
     public struct InverseFoldersLastT : ISortMode
     {
         public ReadOnlySpan<byte> Name
-            => "Folders Last (Inverted)"u8;
+            => "折叠组最后 (反转)"u8;
 
         public ReadOnlySpan<byte> Description
-            => "In each folder, sort all leaves in inverse lexicographical order, then sort all subfolders in inverse lexicographical order."u8;
+            => "在每个折叠组中，按反字典顺序排序所有数据节点，然后按反字典顺序排序所有子折叠组。"u8;
 
         public IEnumerable<IFileSystemNode> GetChildren(IFileSystemFolder folder)
             => folder.GetLeaves().Cast<IFileSystemNode>().Reverse().Concat(folder.GetSubFolders().Reverse());
@@ -117,10 +117,10 @@ public interface ISortMode : IEquatable<ISortMode>
     public struct InternalOrderT : ISortMode
     {
         public ReadOnlySpan<byte> Name
-            => "Internal Order"u8;
+            => "内部顺序"u8;
 
         public ReadOnlySpan<byte> Description
-            => "In each folder, sort all children in order of their identifiers (i.e. in order of their creation in the filesystem)."u8;
+            => "在每个折叠组中，按标识符顺序排序所有子折叠组（即按其在文件系统中的创建顺序排序）。"u8;
 
         public IEnumerable<IFileSystemNode> GetChildren(IFileSystemFolder folder)
             => folder.Children.OrderBy(c => c.Identifier);
@@ -129,10 +129,10 @@ public interface ISortMode : IEquatable<ISortMode>
     public struct InverseInternalOrderT : ISortMode
     {
         public ReadOnlySpan<byte> Name
-            => "Internal Order (Inverted)"u8;
+            => "内部顺序 (反转)"u8;
 
         public ReadOnlySpan<byte> Description
-            => "In each folder, sort all children in inverse order of their identifiers (i.e. in inverse order of their creation in the filesystem)."u8;
+            => "在每个折叠组中，按反标识符顺序排序所有子折叠组（即按其在文件系统中的创建顺序反序排序）。"u8;
 
         public IEnumerable<IFileSystemNode> GetChildren(IFileSystemFolder folder)
             => folder.Children.OrderByDescending(c => c.Identifier);

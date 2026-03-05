@@ -14,7 +14,7 @@ public sealed class CreateFolderButton(BaseFileSystem fileSystem) : BaseIconButt
 
     /// <inheritdoc/>
     public override void DrawTooltip()
-        => Im.Text("Create a new, empty folder. Can contain '/' to create a directory structure."u8);
+        => Im.Text("新建空折叠组。可以包含 '/' 来创建目录结构。"u8);
 
     /// <inheritdoc/>
     public override bool HasTooltip
