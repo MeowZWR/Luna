@@ -6,11 +6,11 @@ public sealed class DissolveFolderButton(BaseFileSystem fileSystem) : BaseButton
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label(in IFileSystemFolder _)
-        => "Dissolve Folder"u8;
+        => "解除折叠组"u8;
 
     /// <inheritdoc/>
     public override void DrawTooltip(in IFileSystemFolder _)
-        => Im.Text("Remove this folder and move all its children to its parent-folder, if possible."u8);
+        => Im.Text("删除这个折叠组并将其所有子组移动到其父组中（如果有父组的话）。"u8);
 
     /// <inheritdoc/>
     public override bool HasTooltip

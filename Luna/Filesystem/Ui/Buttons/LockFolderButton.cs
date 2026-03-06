@@ -6,7 +6,7 @@ public sealed class LockFolderButton(BaseFileSystem fileSystem) : BaseButton<IFi
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label(in IFileSystemFolder folder)
-        => folder.Locked ? "Unlock Folder"u8 : "Lock Folder"u8;
+        => folder.Locked ? "解锁折叠组"u8 : "锁定折叠组"u8;
 
     /// <inheritdoc/>
     public override void OnClick(in IFileSystemFolder folder)
@@ -19,5 +19,5 @@ public sealed class LockFolderButton(BaseFileSystem fileSystem) : BaseButton<IFi
     /// <inheritdoc/>
     public override void DrawTooltip(in IFileSystemFolder _)
         => Im.Text(
-            "Locking an item prevents this item from being dragged to other positions. It does not prevent any other manipulations of the item."u8);
+            "锁定一个折叠组可以防止它被拖动到其他位置。不会阻止对折叠组的其他操作。"u8);
 }

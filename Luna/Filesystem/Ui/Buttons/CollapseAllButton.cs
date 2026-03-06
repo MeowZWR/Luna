@@ -7,7 +7,7 @@ public sealed class CollapseAllButton(BaseFileSystem fileSystem, IFilter filter)
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label
-        => "Collapse All Folders"u8;
+        => "收起所有折叠组"u8;
 
     /// <inheritdoc/>
     public override void OnClick()

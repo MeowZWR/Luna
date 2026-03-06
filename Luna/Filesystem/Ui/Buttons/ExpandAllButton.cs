@@ -7,7 +7,7 @@ public sealed class ExpandAllButton(BaseFileSystem fileSystem, IFilter filter) :
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label
-        => "Expand All Folders"u8;
+        => "展开所有折叠组"u8;
 
     /// <inheritdoc/>
     public override void OnClick()

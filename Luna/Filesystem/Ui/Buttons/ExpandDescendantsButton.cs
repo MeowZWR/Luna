@@ -7,7 +7,7 @@ public sealed class ExpandDescendantsButton(BaseFileSystem fileSystem, IFilter f
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label(in IFileSystemFolder _)
-        => "Expand All Descendants"u8;
+        => "展开所有子折叠组"u8;
 
     /// <inheritdoc/>
     public override void OnClick(in IFileSystemFolder folder)
@@ -19,5 +19,5 @@ public sealed class ExpandDescendantsButton(BaseFileSystem fileSystem, IFilter f
 
     /// <inheritdoc/>
     public override void DrawTooltip(in IFileSystemFolder _)
-        => Im.Text("Successively expand all folders that descend from this folder, including itself."u8);
+        => Im.Text("依次展开这个折叠组的所有子折叠组，包括它自己。"u8);
 }

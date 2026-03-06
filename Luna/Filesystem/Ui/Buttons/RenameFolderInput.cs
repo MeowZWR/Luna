@@ -28,7 +28,7 @@ public sealed class RenameFolderInput(BaseFileSystem fileSystem) : BaseButton<IF
             ret = true;
         }
 
-        Im.Tooltip.OnHover("Enter a full path here to move or rename the folder. Creates all required parent directories, if possible."u8);
+        Im.Tooltip.OnHover("输入一个完整路径来移动或重命名这个折叠组。如果可能的话，会创建所有需要的父折叠组。"u8);
         return ret;
     }
 }

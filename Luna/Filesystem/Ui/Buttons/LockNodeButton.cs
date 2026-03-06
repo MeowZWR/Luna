@@ -25,5 +25,5 @@ public sealed class LockNodeButton(BaseFileSystem fileSystem, ReadOnlySpan<byte>
     /// <inheritdoc/>
     public override void DrawTooltip(in IFileSystemData _)
         => Im.Text(
-            "Locking an item prevents this item from being dragged to other positions. It does not prevent any other manipulations of the item."u8);
+            "锁定一个物品可以防止它被拖动到其他位置。不会阻止对物品的其他操作。"u8);
 }

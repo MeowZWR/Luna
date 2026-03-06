@@ -7,7 +7,7 @@ public sealed class CollapseDescendantsButton(BaseFileSystem fileSystem, IFilter
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label(in IFileSystemFolder _)
-        => "Collapse All Descendants"u8;
+        => "收起所有子折叠组"u8;
 
     /// <inheritdoc/>
     public override void OnClick(in IFileSystemFolder folder)
