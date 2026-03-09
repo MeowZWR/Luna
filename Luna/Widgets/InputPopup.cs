@@ -6,12 +6,12 @@ public static class InputPopup
     /// <summary> Open a new single line text input popup for names and move keyboard focus to it. </summary>
     /// <inheritdoc cref="Open"/>
     public static bool OpenName(Utf8LabelHandler popupName, out string result, float width = 0)
-        => Open(popupName, StringU8.Empty, out result, "Enter New Name..."u8, width);
+        => Open(popupName, StringU8.Empty, out result, "输入新名称..."u8, width);
 
     /// <summary> Open a new single line text input popup for names and move keyboard focus to it. </summary>
     /// <inheritdoc cref="Open"/>
     public static bool OpenName(Utf8LabelHandler popupName, Utf8TextHandler inputText, out string result, float width = 0)
-        => Open(popupName, inputText, out result, "Enter New Name..."u8, width);
+        => Open(popupName, inputText, out result, "输入新名称..."u8, width);
 
     /// <summary> Open a new single line text input popup with a hint and move keyboard focus to it. </summary>
     /// <param name="popupName"> The name of the popup to begin. This needs to be on the same id stack level as the <see cref="Im.Popup.Open(Utf8LabelHandler,PopupFlags)"/> call. </param>
