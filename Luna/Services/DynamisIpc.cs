@@ -300,7 +300,7 @@ public class DynamisIpc : IDisposable, IService
             }
         }
 
-        Im.Tooltip.OnHover("Click to copy to clipboard."u8);
+        Im.Tooltip.OnHover("点击复制到剪贴板。"u8);
     }
 
     // See https://github.com/Exter-N/Dynamis/blob/main/Dynamis/UI/ImGuiComponents.cs

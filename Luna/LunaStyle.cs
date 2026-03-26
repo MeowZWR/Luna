@@ -192,6 +192,6 @@ public static partial class LunaStyle
             }
         }
 
-        Im.Tooltip.OnHover("Click to copy to clipboard."u8);
+        Im.Tooltip.OnHover("点击复制到剪贴板。"u8);
     }
 }
