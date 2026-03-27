@@ -81,8 +81,8 @@ public static class SupportButton
             .Push(ImGuiColor.ButtonActive,  LunaStyle.ReniColorActive);
 
         Link(message, "新手指南"u8, "https://reniguide.info/", width,
-            "Open https://reniguide.info/\nImage and text based guides for most functionality of Penumbra made by Serenity.\n"u8
-          + "Not directly affiliated and potentially, but not usually out of date."u8);
+            "访问 https://reniguide.info/\n由 Serenity 制作的包含 Penumbra 大部分功能的图片和文字教程（英文）。\n"u8
+          + "非官方指南，但通常不会过时。"u8);
     }
 
     /// <summary> Draw a button that opens an address in the browser. </summary>
