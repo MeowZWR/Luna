@@ -199,6 +199,7 @@ public static class SupportButton
     {
         Active     = 0xFF5B5EFFu,
         Background = 0xFFFFC313u,
+        Text       = 0xFF302010u,
         Hovered    = ColorParameter.Default,
         Tooltip    = new StringU8($"在浏览器中打开 Ottermandias 的 Ko-Fi 页面 {KofiAddress}。\n\n{Happiness}"),
     };
@@ -208,6 +209,7 @@ public static class SupportButton
         Active     = 0xFF492C00u,
         Hovered    = ColorParameter.Default,
         Background = 0xFF5467F7u,
+        Text       = 0xFF302010u,
         Tooltip    = new StringU8($"在浏览器中打开 Ottermandias 的 Patreon 页面 {PatreonAddress}。\n\n{Happiness}"),
     };
 

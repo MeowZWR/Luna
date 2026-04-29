@@ -115,7 +115,7 @@ public static class KeySelector
             {
                 Im.Item.SetNextWidth(width);
                 changes |= Modifier("额外组合键"u8,
-                    "设置另一个可选的修饰键，与选定的热键和第一个修饰键一起使用以触发组合键。"u8,
+                    "设置另一个可选的修饰键，与选定的热键和第一个修饰键一起使用。"u8,
                     currentValue.Modifiers.Modifier2, k => copy.SetModifier2(k));
             }
         }

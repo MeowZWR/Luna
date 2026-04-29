@@ -26,6 +26,15 @@ public static class JsonFunctions
         NewLine         = "\n",
     };
 
+    /// <summary> The default JSON Writer options we use. </summary>
+    public static readonly JsonWriterOptions UnformattedOptions = new()
+    {
+        SkipValidation = true,
+        Indented       = false,
+        IndentSize     = 0,
+        NewLine        = "\n",
+    };
+
     /// <summary> The default JSON Reader options we use. </summary>
     public static readonly JsonReaderOptions ReaderOptions = new()
     {
@@ -43,10 +52,11 @@ public static class JsonFunctions
 
     /// <summary> Read the bytes from a given file but strip a potential UTF8-BOM. </summary>
     /// <param name="filePath"> The full path to the file. </param>
+    /// <param name="bytes"> The full bytes of the file, without stripped BOM. </param>
     /// <returns> The full byte data of the file, unless it starts with a UTF8-BOM, which is stripped. </returns>
-    public static ReadOnlyMemory<byte> ReadUtf8Bytes(string filePath)
+    public static ReadOnlyMemory<byte> ReadUtf8Bytes(string filePath, out byte[] bytes)
     {
-        var bytes = File.ReadAllBytes(filePath);
+        bytes = File.ReadAllBytes(filePath);
         if (bytes.Length < 3)
             return bytes;
 
@@ -57,273 +67,575 @@ public static class JsonFunctions
         return bytes;
     }
 
-    /// <summary> Read the UTF8 string at the current token, unescaped, into an UTF8 string without re-encoding. </summary>
-    /// <param name="reader"> The JSON reader. </param>
-    /// <param name="text"> On success, the UTF8 string. </param>
-    /// <returns> True on success, false if the current token is not a string. </returns>
-    public static bool TryReadUtf8String(this ref Utf8JsonReader reader, [NotNullWhen(true)] out StringU8? text)
+    /// <summary> Recovers potentially invalid JSON data using <see cref="JsonRecoveryStream"/>. </summary>
+    /// <param name="originalBytes"> The potentially invalid JSON data. </param>
+    /// <param name="autoTranscodeToUtf8"> Whether to also strip the UTF-8 BOM and/or transcode from UTF-16 to UTF-8. </param>
+    /// <param name="allowedRecoveries"> The cases that this operation is allowed to recover from. </param>
+    /// <param name="crlfReplacement"> The token to replace any raw CR LF tokens with. </param>
+    /// <returns>
+    ///   <list>
+    ///     <item> The corrected JSON data. </item>
+    ///     <item> The original encoding, if a BOM was recognized and stripped, otherwise <c>null</c>. </item>
+    ///     <item> The cases that this operation has recovered from. </item>
+    ///   </list>
+    /// </returns>
+    /// <exception cref="InvalidDataException"> Some case of invalid JSON data was encountered that cannot be recovered from. </exception>
+    public static (byte[] RecoveredBytes, Encoding? BomEncoding, JsonRecoveryFlags UsedRecoveries) RecoverBytes(byte[] originalBytes,
+        bool autoTranscodeToUtf8, JsonRecoveryFlags allowedRecoveries, string crlfReplacement = "\\n")
     {
-        if (reader.TokenType is not JsonTokenType.String)
-        {
-            text = null;
-            return false;
-        }
+        using var memoryStream = new MemoryStream(originalBytes.Length);
 
-        if (!reader.HasValueSequence)
-        {
-            var array = new byte[reader.ValueSpan.Length + 1];
-            array[reader.ValueSpan.Length] = 0;
-            reader.ValueSpan.CopyTo(array);
-            text = StringU8.CreateUnchecked(array.AsMemory(..^1));
-            return true;
-        }
+        var recoveryStream    = new JsonRecoveryStream(allowedRecoveries, memoryStream, crlfReplacement, true);
+        var transcodingStream = autoTranscodeToUtf8 ? new AutoUtf8TranscodingStream(recoveryStream) : null;
+        var outputStream      = (Stream?)transcodingStream ?? recoveryStream;
+        outputStream.Write(originalBytes, 0, originalBytes.Length);
+        outputStream.Close();
 
-        var seq    = reader.ValueSequence;
-        var length = 1;
-        foreach (var span in seq)
-            length += span.Length;
-
-        var ret = new byte[length];
-        ret[^1] = 0;
-        var tmp = ret.AsMemory();
-        foreach (var span in seq)
-        {
-            span.CopyTo(tmp);
-            tmp = tmp[span.Length..];
-        }
-
-        text = StringU8.CreateUnchecked(ret.AsMemory(..^1));
-        return true;
+        return (memoryStream.ToArray(), transcodingStream?.BomEncoding, recoveryStream.UsedRecoveries);
     }
 
-    /// <summary> Try to read a property ensuring it is an array. </summary>
-    /// <param name="parent"> The parent JSON element. </param>
-    /// <param name="property"> The name of the queried property. </param>
-    /// <param name="array"> The queried property on success. </param>
-    /// <returns> True if the property exists and is an array type. </returns>
-    public static bool TryReadArray(this in JsonElement parent, ReadOnlySpan<byte> property, out JsonElement array)
+    /// <summary> Recovers potentially invalid JSON data using <see cref="JsonRecoveryStream"/>. </summary>
+    /// <param name="filePath"> The potentially invalid JSON file. It will be replaced by the corrected one, if any correction happens. </param>
+    /// <param name="autoTranscodeToUtf8"> Whether to also strip the UTF-8 BOM and/or transcode from UTF-16 to UTF-8. </param>
+    /// <param name="allowedRecoveries"> The cases that this operation is allowed to recover from. </param>
+    /// <param name="crlfReplacement"> The token to replace any raw CR LF tokens with. </param>
+    /// <returns>
+    ///   <list>
+    ///     <item> The read (and potentially recovered) byte data. </item>
+    ///     <item> Whether this operation replaced the given file by a corrected one. </item>
+    ///     <item> The original encoding, if a BOM was recognized and stripped, otherwise <c>null</c>. </item>
+    ///     <item> The cases that this operation has recovered from. </item>
+    ///   </list>
+    /// </returns>
+    /// <exception cref="InvalidDataException"> Some case of invalid JSON data was encountered that cannot be recovered from. </exception>
+    public static (byte[] FileData, bool FileModified, Encoding? BomEncoding, JsonRecoveryFlags UsedRecoveries) RecoverFile(string filePath,
+        bool autoTranscodeToUtf8, JsonRecoveryFlags allowedRecoveries, string crlfReplacement = "\\n")
     {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (!parent.TryGetProperty(property, out array))
-            return false;
+        var originalBytes = File.ReadAllBytes(filePath);
+        var (recoveredBytes, bomEncoding, usedRecoveries) = RecoverBytes(originalBytes, autoTranscodeToUtf8, allowedRecoveries, crlfReplacement);
+        if (originalBytes.SequenceEqual(recoveredBytes))
+            return (recoveredBytes, false, bomEncoding, usedRecoveries);
 
-        return array.ValueKind is JsonValueKind.Array;
+        File.Move(filePath, filePath + ".bak");
+        File.WriteAllBytes(filePath, recoveredBytes);
+        return (recoveredBytes, true, bomEncoding, usedRecoveries);
     }
 
-    /// <summary> Try to read a property ensuring it is an object. </summary>
-    /// <param name="parent"> The parent JSON element. </param>
-    /// <param name="property"> The name of the queried property. </param>
-    /// <param name="object"> The queried property on success. </param>
-    /// <returns> True if the property exists and is an object type. </returns>
-    public static bool TryReadObject(this in JsonElement parent, ReadOnlySpan<byte> property, out JsonElement @object)
+    /// <inheritdoc cref="RecoverFile"/>
+    public static async Task<(byte[] FileData, bool FileModified, Encoding? BomEncoding, JsonRecoveryFlags UsedRecoveries)> RecoverFileAsync(string filePath,
+        bool autoTranscodeToUtf8, JsonRecoveryFlags allowedRecoveries, string crlfReplacement = "\\n")
     {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (!parent.TryGetProperty(property, out @object))
-            return false;
+        var originalBytes = await File.ReadAllBytesAsync(filePath);
+        var (recoveredBytes, bomEncoding, usedRecoveries) = RecoverBytes(originalBytes, autoTranscodeToUtf8, allowedRecoveries, crlfReplacement);
+        if (originalBytes.SequenceEqual(recoveredBytes))
+            return (recoveredBytes, false, bomEncoding, usedRecoveries);
 
-        return @object.ValueKind is JsonValueKind.Object;
+        File.Move(filePath, filePath + ".bak");
+        await File.WriteAllBytesAsync(filePath, recoveredBytes);
+        return (recoveredBytes, true, bomEncoding, usedRecoveries);
     }
 
-    /// <summary> Try to read a property's value by name. </summary>
-    /// <param name="parent"> The parent JSON element. </param>
-    /// <param name="property"> The name of the queried property. </param>
-    /// <param name="value"> The returned value on success, <c>default</c> otherwise. </param>
-    /// <returns> True if the property exists and can be parsed to the requested value type. </returns>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, [NotNullWhen(true)] out string? value)
+    /// <summary> Return values for peeking a property. </summary>
+    public enum PeekError
     {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (!parent.TryGetProperty(property, out var element) || element.GetString() is not { } text)
+        /// <summary> Successfully parsed the requested property. </summary>
+        Success,
+
+        /// <summary> The requested property existed, but  could not be parsed. </summary>
+        Invalid,
+
+        /// <summary> The requested property did not exist. </summary>
+        Missing,
+
+        /// <summary> The JSON was malformed. </summary>
+        Malformed,
+    }
+
+    /// <param name="reader"> The reader. If the requested property is the first encountered property, its position will be incremented, otherwise it will stay the same. </param>
+    extension(scoped ref Utf8JsonReader reader)
+    {
+        /// <summary> Create a sub-reader utility on the current value token. </summary>
+        /// <remarks>
+        ///   Use <see cref="Utf8JsonObjectReader.Read"/> for reading within the current value.<br/>
+        ///   If the current value is an object or an array, this will return true until the end of this object is reached.<br/>
+        ///   If it is a value type (null, a number, a string, or true or false), it will never return true.<br/>
+        ///   If it is any other token type, it will throw on construction. <br/>
+        ///   After returning false, if it started on an object or array, the cursor will be located on the <see cref="JsonTokenType.EndObject"/> or <see cref="JsonTokenType.EndArray"/> token.
+        /// </remarks>
+        public Utf8JsonObjectReader CreateObjectReader()
+            => new(reader);
+
+        /// <summary> Read an enumeration property type from a single object regardless of property order in this object. </summary>
+        /// <param name="property"> The name of the requested property. </param>
+        /// <param name="value"> The parsed value for that property on success or default on failure. </param>
+        /// <returns> The reason for failure or success. </returns>
+        /// <remarks> Assumes a starting point on a StartObject. </remarks>
+        public PeekError TryPeekEnumProperty<TEnum>(ReadOnlySpan<byte> property, out TEnum value)
+            where TEnum : unmanaged, Enum
         {
-            value = null;
-            return false;
+            // We create a copy of the reader to be independent of the order of properties.
+            var copy = reader;
+            value = default;
+            var nonEnumPropertyEncountered = false;
+            var success                    = false;
+            var objectReader               = copy.CreateObjectReader();
+            // Read all tokens.
+            while (objectReader.Read(ref copy))
+            {
+                // If the token is a property, check if it is the type property.
+                if (copy.TokenType is JsonTokenType.PropertyName)
+                {
+                    if (copy.ValueTextEquals(property))
+                    {
+                        // Type properties will be parsed, If this all succeeds, break out of the loop.
+                        if (!copy.Read() || !copy.TryReadUtf8String(out var text))
+                            return PeekError.Invalid;
+
+                        if (!EnumExtensions.Parse(text.Value, out value))
+                            return PeekError.Invalid;
+
+                        success = true;
+                        break;
+                    }
+
+                    // If we encounter a different property first, skip it and mark that.
+                    copy.Skip();
+                    nonEnumPropertyEncountered = true;
+                }
+                // If we encounter a different object, skip it and mark that. (This should be invalid JSON?)
+                else if (copy.TokenType is JsonTokenType.StartObject)
+                {
+                    copy.Skip();
+                    nonEnumPropertyEncountered = true;
+                }
+            }
+
+            // We iterated all tokens without encountering a type property or an end.
+            if (!success)
+                return copy.TokenType is JsonTokenType.EndObject ? PeekError.Missing : PeekError.Malformed;
+
+            // If we did not skip any properties, we can use the copied readers position.
+            if (!nonEnumPropertyEncountered)
+                reader = copy;
+
+            return PeekError.Success;
         }
 
-        value = text;
-        return true;
-    }
-
-    /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, out bool value)
-    {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (!parent.TryGetProperty(property, out var element))
+        /// <summary> Read the UTF8 string at the current token, unescaped, into an UTF8 string without re-encoding. </summary>
+        /// <param name="text"> On success, the UTF8 string. </param>
+        /// <returns> True on success, false if the current token is not a string. </returns>
+        public bool TryReadUtf8String([NotNullWhen(true)] out StringU8? text)
         {
-            value = false;
-            return true;
-        }
-
-        switch (element.ValueKind)
-        {
-            case JsonValueKind.True:
-                value = true;
-                return true;
-            case JsonValueKind.False:
-                value = false;
-                return true;
-            default:
-                value = false;
+            if (reader.TokenType is not JsonTokenType.String and not JsonTokenType.PropertyName)
+            {
+                text = null;
                 return false;
+            }
+
+            if (!reader.HasValueSequence)
+            {
+                var array = new byte[reader.ValueSpan.Length + 1];
+                array[reader.ValueSpan.Length] = 0;
+                reader.ValueSpan.CopyTo(array);
+                text = StringU8.CreateUnchecked(array.AsMemory(..^1));
+                return true;
+            }
+
+            var seq    = reader.ValueSequence;
+            var length = 1;
+            foreach (var span in seq)
+                length += span.Length;
+
+            var ret = new byte[length];
+            ret[^1] = 0;
+            var tmp = ret.AsMemory();
+            foreach (var span in seq)
+            {
+                span.CopyTo(tmp);
+                tmp = tmp[span.Length..];
+            }
+
+            text = StringU8.CreateUnchecked(ret.AsMemory(..^1));
+            return true;
+        }
+
+        /// <summary> Read the string at the current token and return it as a UTF16 string. </summary>
+        /// <param name="text"> Returns the parsed text, <paramref name="default"/> on failure to parse, or <c>null</c> if <paramref name="allowNull"/> and the token is null.</param>
+        /// <param name="default"> The default text to set on failure to parse. </param>
+        /// <param name="allowNull"> Whether a null token is allowed to be parsed into null, or is a failure to parse. </param>
+        /// <returns> True if the string was successfully parsed or was a null token with <paramref name="allowNull"/>. </returns>
+        public bool TryReadString(out string? text, string @default = "", bool allowNull = false)
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.PropertyName:
+                case JsonTokenType.String:
+                    text = reader.GetString();
+                    if (text is null)
+                    {
+                        text = @default;
+                        return false;
+                    }
+
+                    return true;
+                case JsonTokenType.Null:
+                    if (!allowNull)
+                    {
+                        text = @default;
+                        return false;
+                    }
+
+                    text = null;
+                    return true;
+                case JsonTokenType.True:
+                    text = "True";
+                    return true;
+                case JsonTokenType.False:
+                    text = "False";
+                    return true;
+                default:
+                    text = @default;
+                    return false;
+            }
+        }
+
+        /// <summary> Read the UTF8 string at the current token, unescaped, and parse it into an enumeration value. </summary>
+        /// <typeparam name="TEnum"> The enumeration type. </typeparam>
+        /// <param name="value"> On success, the parsed enumeration value. </param>
+        /// <returns> True on success, false if the current token is not a string or the string does not correspond to a known enumeration value. </returns>
+        public bool TryReadTextEnum<TEnum>(out TEnum value) where TEnum : unmanaged, Enum
+        {
+            if (!reader.TryReadUtf8String(out var text))
+            {
+                value = default;
+                return false;
+            }
+
+            return EnumExtensions.Parse(text.Value, out value);
+        }
+
+        /// <summary> Try to read the current token as a number of the given type. </summary>
+        /// <typeparam name="TNumber"> The type of number to read. </typeparam>
+        /// <param name="number"> The return value on success, <paramref name="default"/> on failure. </param>
+        /// <param name="default"> The default value to return if the number can not be read. </param>
+        /// <returns> True if the number was successfully read, false otherwise. </returns>
+        /// <exception cref="ArgumentException"> If <typeparamref name="TNumber"/> is not one of the built-in integers or floats. </exception>
+        public bool TryReadNumber<TNumber>(out TNumber number, TNumber @default = default) where TNumber : unmanaged, INumber<TNumber>
+        {
+            // Read the actual number according to type.
+            if (reader.TokenType is JsonTokenType.Number)
+            {
+                if (typeof(TNumber) == typeof(byte) && reader.TryGetByte(out var b))
+                {
+                    number = Unsafe.As<byte, TNumber>(ref b);
+                    return true;
+                }
+
+                if (typeof(TNumber) == typeof(sbyte) && reader.TryGetSByte(out var sb))
+                {
+                    number = Unsafe.As<sbyte, TNumber>(ref sb);
+                    return true;
+                }
+
+                if (typeof(TNumber) == typeof(ushort) && reader.TryGetUInt16(out var us))
+                {
+                    number = Unsafe.As<ushort, TNumber>(ref us);
+                    return true;
+                }
+
+                if (typeof(TNumber) == typeof(short) && reader.TryGetInt16(out var s))
+                {
+                    number = Unsafe.As<short, TNumber>(ref s);
+                    return true;
+                }
+
+                if (typeof(TNumber) == typeof(uint) && reader.TryGetUInt32(out var ui))
+                {
+                    number = Unsafe.As<uint, TNumber>(ref ui);
+                    return true;
+                }
+
+                if (typeof(TNumber) == typeof(int) && reader.TryGetInt32(out var i))
+                {
+                    number = Unsafe.As<int, TNumber>(ref i);
+                    return true;
+                }
+
+                if (typeof(TNumber) == typeof(ulong) && reader.TryGetUInt64(out var ul))
+                {
+                    number = Unsafe.As<ulong, TNumber>(ref ul);
+                    return true;
+                }
+
+                if (typeof(TNumber) == typeof(long) && reader.TryGetInt64(out var l))
+                {
+                    number = Unsafe.As<long, TNumber>(ref l);
+                    return true;
+                }
+
+                if (typeof(TNumber) == typeof(float) && reader.TryGetSingle(out var f))
+                {
+                    number = Unsafe.As<float, TNumber>(ref f);
+                    return true;
+                }
+
+                if (typeof(TNumber) == typeof(double) && reader.TryGetDouble(out var d))
+                {
+                    number = Unsafe.As<double, TNumber>(ref d);
+                    return true;
+                }
+
+                throw new ArgumentException($"{typeof(TNumber)} is not supported.");
+            }
+
+            // Read the number as string and try to parse it.
+            // TryReadUtf8String checks the token type itself.
+            if (reader.TryReadUtf8String(out var text) && TNumber.TryParse(text.Value, null, out number))
+                return true;
+
+            // All other cases are not valid numbers.
+            number = @default;
+            return false;
+        }
+
+        /// <summary> Skip to the end of the current object. </summary>
+        public void SkipCurrentObject()
+        {
+            var objectReader = reader.CreateObjectReader();
+            while (objectReader.Read(ref reader))
+                ;
+        }
+
+        /// <summary> Read the current token and parse it to a bool if possible. </summary>
+        /// <param name="value"> On success, the parsed boolean value. </param>
+        /// <returns> True on success, false if the current token is not a boolean token or a string that is equal to 'True', 'true', 'False' or 'false'. </returns>
+        public bool TryReadBoolean(out bool value)
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.True:
+                    value = true;
+                    return true;
+                case JsonTokenType.False:
+                    value = false;
+                    return true;
+                case JsonTokenType.String when reader.ValueTextEquals("true"u8) || reader.ValueTextEquals("True"):
+                    value = true;
+                    return true;
+                case JsonTokenType.String when reader.ValueTextEquals("false"u8) || reader.ValueTextEquals("False"):
+                    value = false;
+                    return true;
+            }
+
+            value = false;
+            return false;
         }
     }
 
-    /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, out sbyte value)
+    /// <param name="parent"> The parent JSON element. </param>
+    extension(in JsonElement parent)
     {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (parent.TryGetProperty(property, out var element) && !element.TryGetSByte(out value))
-            return true;
+        /// <summary> Try to read a property ensuring it is an array. </summary>
+        /// <param name="property"> The name of the queried property. </param>
+        /// <param name="array"> The queried property on success. </param>
+        /// <returns> True if the property exists and is an array type. </returns>
+        public bool TryReadArray(ReadOnlySpan<byte> property, out JsonElement array)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (!parent.TryGetProperty(property, out array))
+                return false;
 
-        value = 0;
-        return false;
+            return array.ValueKind is JsonValueKind.Array;
+        }
+
+        /// <summary> Try to read a property ensuring it is an object. </summary>
+        /// <param name="property"> The name of the queried property. </param>
+        /// <param name="object"> The queried property on success. </param>
+        /// <returns> True if the property exists and is an object type. </returns>
+        public bool TryReadObject(ReadOnlySpan<byte> property, out JsonElement @object)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (!parent.TryGetProperty(property, out @object))
+                return false;
+
+            return @object.ValueKind is JsonValueKind.Object;
+        }
+
+        /// <summary> Try to read a property's value by name. </summary>
+        /// <param name="property"> The name of the queried property. </param>
+        /// <param name="value"> The returned value on success, <c>default</c> otherwise. </param>
+        /// <returns> True if the property exists and can be parsed to the requested value type. </returns>
+        [MethodImpl(ImSharpConfiguration.Inl)]
+        public bool TryReadProperty(ReadOnlySpan<byte> property, [NotNullWhen(true)] out string? value)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (!parent.TryGetProperty(property, out var element) || element.GetString() is not { } text)
+            {
+                value = null;
+                return false;
+            }
+
+            value = text;
+            return true;
+        }
+
+        /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
+        [MethodImpl(ImSharpConfiguration.Inl)]
+        public bool TryReadProperty(ReadOnlySpan<byte> property, out sbyte value)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (parent.TryGetProperty(property, out var element) && !element.TryGetSByte(out value))
+                return true;
+
+            value = 0;
+            return false;
+        }
+
+        /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
+        [MethodImpl(ImSharpConfiguration.Inl)]
+        public bool TryReadProperty(ReadOnlySpan<byte> property, out byte value)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (parent.TryGetProperty(property, out var element) && !element.TryGetByte(out value))
+                return true;
+
+            value = 0;
+            return false;
+        }
+
+        /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
+        [MethodImpl(ImSharpConfiguration.Inl)]
+        public bool TryReadProperty(ReadOnlySpan<byte> property, out short value)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (parent.TryGetProperty(property, out var element) && !element.TryGetInt16(out value))
+                return true;
+
+            value = 0;
+            return false;
+        }
+
+        /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
+        [MethodImpl(ImSharpConfiguration.Inl)]
+        public bool TryReadProperty(ReadOnlySpan<byte> property, out ushort value)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (parent.TryGetProperty(property, out var element) && !element.TryGetUInt16(out value))
+                return true;
+
+            value = 0;
+            return false;
+        }
+
+        /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
+        [MethodImpl(ImSharpConfiguration.Inl)]
+        public bool TryReadProperty(ReadOnlySpan<byte> property, out int value)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (parent.TryGetProperty(property, out var element) && !element.TryGetInt32(out value))
+                return true;
+
+            value = 0;
+            return false;
+        }
+
+        /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
+        [MethodImpl(ImSharpConfiguration.Inl)]
+        public bool TryReadProperty(ReadOnlySpan<byte> property, out uint value)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (parent.TryGetProperty(property, out var element) && !element.TryGetUInt32(out value))
+                return true;
+
+            value = 0;
+            return false;
+        }
+
+        /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
+        [MethodImpl(ImSharpConfiguration.Inl)]
+        public bool TryReadProperty(ReadOnlySpan<byte> property, out long value)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (parent.TryGetProperty(property, out var element) && !element.TryGetInt64(out value))
+                return true;
+
+            value = 0;
+            return false;
+        }
+
+        /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
+        [MethodImpl(ImSharpConfiguration.Inl)]
+        public bool TryReadProperty(ReadOnlySpan<byte> property, out ulong value)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (parent.TryGetProperty(property, out var element) && !element.TryGetUInt64(out value))
+                return true;
+
+            value = 0;
+            return false;
+        }
+
+        /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
+        [MethodImpl(ImSharpConfiguration.Inl)]
+        public bool TryReadProperty(ReadOnlySpan<byte> property, out float value)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (parent.TryGetProperty(property, out var element) && !element.TryGetSingle(out value))
+                return true;
+
+            value = 0;
+            return false;
+        }
+
+        /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
+        [MethodImpl(ImSharpConfiguration.Inl)]
+        public bool TryReadProperty(ReadOnlySpan<byte> property, out double value)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (parent.TryGetProperty(property, out var element) && !element.TryGetDouble(out value))
+                return true;
+
+            value = 0;
+            return false;
+        }
+
+        /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
+        [MethodImpl(ImSharpConfiguration.Inl)]
+        public bool TryReadProperty(ReadOnlySpan<byte> property, out Guid value)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (parent.TryGetProperty(property, out var element) && !element.TryGetGuid(out value))
+                return true;
+
+            value = Guid.Empty;
+            return false;
+        }
+
+        /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
+        [MethodImpl(ImSharpConfiguration.Inl)]
+        public bool TryReadProperty(ReadOnlySpan<byte> property, out DateTime value)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (parent.TryGetProperty(property, out var element) && !element.TryGetDateTime(out value))
+                return true;
+
+            value = DateTime.UnixEpoch;
+            return false;
+        }
+
+        /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
+        [MethodImpl(ImSharpConfiguration.Inl)]
+        public bool TryReadProperty(ReadOnlySpan<byte> property, out DateTimeOffset value)
+        {
+            Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
+            if (parent.TryGetProperty(property, out var element) && !element.TryGetDateTimeOffset(out value))
+                return true;
+
+            value = DateTimeOffset.UnixEpoch;
+            return false;
+        }
     }
 
-    /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, out byte value)
-    {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (parent.TryGetProperty(property, out var element) && !element.TryGetByte(out value))
-            return true;
-
-        value = 0;
-        return false;
-    }
-
-
-    /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, out short value)
-    {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (parent.TryGetProperty(property, out var element) && !element.TryGetInt16(out value))
-            return true;
-
-        value = 0;
-        return false;
-    }
-
-    /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, out ushort value)
-    {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (parent.TryGetProperty(property, out var element) && !element.TryGetUInt16(out value))
-            return true;
-
-        value = 0;
-        return false;
-    }
-
-    /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, out int value)
-    {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (parent.TryGetProperty(property, out var element) && !element.TryGetInt32(out value))
-            return true;
-
-        value = 0;
-        return false;
-    }
-
-    /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, out uint value)
-    {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (parent.TryGetProperty(property, out var element) && !element.TryGetUInt32(out value))
-            return true;
-
-        value = 0;
-        return false;
-    }
-
-    /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, out long value)
-    {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (parent.TryGetProperty(property, out var element) && !element.TryGetInt64(out value))
-            return true;
-
-        value = 0;
-        return false;
-    }
-
-    /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, out ulong value)
-    {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (parent.TryGetProperty(property, out var element) && !element.TryGetUInt64(out value))
-            return true;
-
-        value = 0;
-        return false;
-    }
-
-    /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, out float value)
-    {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (parent.TryGetProperty(property, out var element) && !element.TryGetSingle(out value))
-            return true;
-
-        value = 0;
-        return false;
-    }
-
-    /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, out double value)
-    {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (parent.TryGetProperty(property, out var element) && !element.TryGetDouble(out value))
-            return true;
-
-        value = 0;
-        return false;
-    }
-
-    /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, out Guid value)
-    {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (parent.TryGetProperty(property, out var element) && !element.TryGetGuid(out value))
-            return true;
-
-        value = Guid.Empty;
-        return false;
-    }
-
-    /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, out DateTime value)
-    {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (parent.TryGetProperty(property, out var element) && !element.TryGetDateTime(out value))
-            return true;
-
-        value = DateTime.UnixEpoch;
-        return false;
-    }
-
-    /// <inheritdoc cref="TryReadProperty(in JsonElement,ReadOnlySpan{byte},out string?)"/>
-    [MethodImpl(ImSharpConfiguration.Inl)]
-    public static bool TryReadProperty(this in JsonElement parent, ReadOnlySpan<byte> property, out DateTimeOffset value)
-    {
-        Debug.Assert(parent.ValueKind is JsonValueKind.Object, "JSON parent value is not an object.");
-        if (parent.TryGetProperty(property, out var element) && !element.TryGetDateTimeOffset(out value))
-            return true;
-
-        value = DateTimeOffset.UnixEpoch;
-        return false;
-    }
 
     /// <summary> Only write a string property if the string is neither null nor empty. </summary>
     /// <param name="j"> The JSON writer. </param>
@@ -644,4 +956,32 @@ public static class JsonFunctions
             }
         }
     }
+}
+
+/// <summary> A helper struct to parse within a single property value or object. </summary>
+/// <param name="reader"> The reader to base this in. </param>
+public readonly ref struct Utf8JsonObjectReader(scoped in Utf8JsonReader reader)
+{
+    /// <summary> The depth of the current object. </summary>
+    public readonly int ObjectDepth = reader.CurrentDepth;
+
+    /// <summary> The type of the end token we use as stop. </summary>
+    public readonly JsonTokenType Type = reader.TokenType switch
+    {
+        JsonTokenType.StartArray  => JsonTokenType.EndArray,
+        JsonTokenType.StartObject => JsonTokenType.EndObject,
+        JsonTokenType.Null        => JsonTokenType.None,
+        JsonTokenType.Number      => JsonTokenType.None,
+        JsonTokenType.String      => JsonTokenType.None,
+        JsonTokenType.True        => JsonTokenType.None,
+        JsonTokenType.False       => JsonTokenType.None,
+        _ => throw new JsonException(
+            $"{nameof(Utf8JsonObjectReader)} needs to be initialized on a value token, {nameof(JsonTokenType.StartObject)} or a {nameof(JsonTokenType.StartArray)} token, but is at a {reader.TokenType}."),
+    };
+
+    /// <summary> Read until the end of the current value or object is reached. </summary>
+    /// <param name="reader"> The reader to use for reading (this should technically be stored, but can not be stored as a reference due to C# rules). </param>
+    /// <returns> True if the current read still is inside the current object or array. </returns>
+    public bool Read(scoped ref Utf8JsonReader reader)
+        => Type is not JsonTokenType.None && reader.Read() && (reader.TokenType != Type || reader.CurrentDepth > ObjectDepth);
 }

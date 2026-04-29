@@ -44,10 +44,34 @@ public abstract class FileSystemCache : BasicCache
     public Vector4 LineColor { get; set; } = Vector4.One;
 
     /// <summary> The color to use for collapsed folder labels. </summary>
-    public Vector4 CollapsedFolderColor { get; set; } = Vector4.One;
+    public Vector4 CollapsedFolderColor
+    {
+        get;
+        set
+        {
+            if (value == field)
+                return;
+
+            field = value;
+            foreach (var node in AllNodes.Values.OfType<FileSystemFolderCache>())
+                node.Dirty = true;
+        }
+    } = Vector4.One;
 
     /// <summary> The color to use for expanded folder labels. </summary>
-    public Vector4 ExpandedFolderColor { get; set; } = Vector4.One;
+    public Vector4 ExpandedFolderColor
+    {
+        get;
+        set
+        {
+            if (value == field)
+                return;
+
+            field = value;
+            foreach (var node in AllNodes.Values.OfType<FileSystemFolderCache>())
+                node.Dirty = true;
+        }
+    } = Vector4.One;
 
     /// <summary> The last targeted node for shift-selection operations. </summary>
     protected readonly WeakReference<IFileSystemNode> LastTarget = new(null!);
@@ -69,10 +93,12 @@ public abstract class FileSystemCache : BasicCache
     /// <returns> The cached data for the node. </returns>
     protected IFileSystemNodeCache ConvertNodeInternal(in IFileSystemNode node)
     {
-        if (node is IFileSystemFolder)
-            return new FileSystemFolderCache();
-
-        return ConvertNode(node);
+        return node switch
+        {
+            IFileSystemFolder    => new FileSystemFolderCache(),
+            IFileSystemSeparator => new FileSystemSeparatorCache(),
+            _                    => ConvertNode(node),
+        };
     }
 
     /// <summary> Reactions to file system changes. </summary>
@@ -83,10 +109,13 @@ public abstract class FileSystemCache : BasicCache
             case FileSystemChangeType.ObjectRenamed:
             case FileSystemChangeType.FolderAdded:
             case FileSystemChangeType.DataAdded:
+            case FileSystemChangeType.SeparatorAdded:
             case FileSystemChangeType.ObjectMoved:
             case FileSystemChangeType.LockedChange:
             case FileSystemChangeType.ExpandedChange:
             case FileSystemChangeType.FilterExpandedChange:
+            case FileSystemChangeType.SeparatorChanged:
+            case FileSystemChangeType.FolderChanged:
                 if (!AllNodes.TryGetValue(arguments.ChangedObject, out var node))
                     AllNodes.TryAdd(arguments.ChangedObject, ConvertNodeInternal(arguments.ChangedObject));
                 else
@@ -389,6 +418,17 @@ public abstract class FileSystemCache<TData> : FileSystemCache
         TreeLine.Draw(VisibleNodes, LineColor);
     }
 
+    public override void Update()
+    {
+        if (!ColorsDirty)
+            return;
+
+        CollapsedFolderColor =  Parent.CollapsedFolderColor;
+        ExpandedFolderColor  =  Parent.ExpandedFolderColor;
+        LineColor            =  Parent.FolderLineColor;
+        Dirty                &= ~IManagedCache.DirtyFlags.Colors;
+    }
+
     /// <summary> Update the linearized tree list if needed. </summary>
     /// <returns> True if the list was updated. </returns>
     protected virtual bool UpdateTreeList()
@@ -417,9 +457,10 @@ public abstract class FileSystemCache<TData> : FileSystemCache
             switch (node)
             {
                 // Skip filtered out nodes and add visible data nodes.
-                case IFileSystemData data when visible:
+                case IFileSystemData when visible:
+                case IFileSystemSeparator when visible:
                 {
-                    InternalNodes.Add(new FileSystemTreeNode(this, data, cache)
+                    InternalNodes.Add(new FileSystemTreeNode(this, node, cache)
                     {
                         IndentationDepth = currentDepth,
                         ParentIndex      = parentIndex,
@@ -463,7 +504,7 @@ public abstract class FileSystemCache<TData> : FileSystemCache
                         if (folder.Expanded && !skipDescendants)
                         {
                             // Add all visible children.
-                            foreach (var child in folder.GetChildren(Parent.SortMode))
+                            foreach (var child in folder.GetChildren(folder.SortMode ?? Parent.SortMode))
                                 AddNode(child, index, currentDepth + 1, 0);
                             // We have visible children, so the folder is also visible either way.
                             // The line should only go to the last child nested one deeper, if that is a folder, it may not be the newest child.
@@ -494,7 +535,7 @@ public abstract class FileSystemCache<TData> : FileSystemCache
                             InternalNodes.Add(data);
                             // Add all visible children.
                             if (!skipDescendants)
-                                foreach (var child in folder.GetChildren(Parent.SortMode))
+                                foreach (var child in folder.GetChildren(folder.SortMode ?? Parent.SortMode))
                                     AddNode(child, index, currentDepth + 1, 0);
 
                             if (InternalNodes.Count > index + 1)

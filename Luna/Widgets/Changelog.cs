@@ -36,7 +36,7 @@ public sealed class Changelog : Window
         {
             ChangeLogDisplayType.New           => "显示新更新日志 (推荐)"u8,
             ChangeLogDisplayType.HighlightOnly => "仅显示重要更新日志"u8,
-            ChangeLogDisplayType.Never         => "不显示更新日志 (危险)"u8,
+            ChangeLogDisplayType.Never         => "永不显示更新日志 (危险)"u8,
             _                                  => ""u8,
         };
     }
@@ -202,7 +202,7 @@ public sealed class Changelog : Window
     /// <param name="width"></param>
     private void DrawUnderstoodButton(float width)
     {
-        if (!Im.Button("已了解"u8, new Vector2(width, 0)))
+        if (!Im.Button("Understood"u8, new Vector2(width, 0)))
             return;
 
         if (_lastVersion != _entries.Count)

@@ -1,10 +1,7 @@
 namespace Luna;
 
 /// <summary> The base class to draw a full file system UI. </summary>
-/// <param name="messager"> A messager to inform users of failed operations. </param>
-/// <param name="fileSystem"> The parent file system to draw. </param>
-/// <param name="filter"> The filter used by the drawer to pass to the buttons. </param>
-public abstract class FileSystemDrawer(MessageService messager, BaseFileSystem fileSystem, IFilter filter) : IPanel
+public abstract class FileSystemDrawer : IPanel
 {
     /// <inheritdoc/>>
     public abstract ReadOnlySpan<byte> Id { get; }
@@ -13,22 +10,39 @@ public abstract class FileSystemDrawer(MessageService messager, BaseFileSystem f
     public abstract void Draw();
 
     /// <summary> A messager to inform users of failed operations. </summary>
-    public readonly MessageService Messager = messager;
+    public readonly MessageService Messager;
 
     /// <summary> The parent file system that is drawn by this. </summary>
-    public readonly BaseFileSystem FileSystem = fileSystem;
+    public readonly BaseFileSystem FileSystem;
 
     /// <summary> A footer with buttons that can be added to a two-panel layout. </summary>
-    public readonly ButtonFooter Footer = SetupBaseFooter(fileSystem);
+    public readonly ButtonFooter Footer;
 
     /// <summary> The buttons shown in the main right-click context menu without an associated node. </summary>
-    public readonly ButtonList MainContext = SetupBaseMainContext(fileSystem, filter);
+    public readonly ButtonList MainContext;
 
     /// <summary> The menu items shown in the context menu for folder nodes. </summary>
-    public readonly ButtonList<IFileSystemFolder> FolderContext = SetupBaseFolderContext(fileSystem, filter);
+    public readonly ButtonList<IFileSystemFolder> FolderContext;
+
+    /// <summary> The menu items shown in the context menu for separator nodes. </summary>
+    public readonly ButtonList<IFileSystemSeparator> SeparatorContext = [];
 
     /// <summary> The menu items shown in the context menu for data nodes. </summary>
     public readonly ButtonList<IFileSystemData> DataContext = new();
+
+    /// <summary> The base class to draw a full file system UI. </summary>
+    /// <param name="messager"> A messager to inform users of failed operations. </param>
+    /// <param name="fileSystem"> The parent file system to draw. </param>
+    /// <param name="filter"> The filter used by the drawer to pass to the buttons. </param>
+    protected FileSystemDrawer(MessageService messager, BaseFileSystem fileSystem, IFilter filter)
+    {
+        Messager         = messager;
+        FileSystem       = fileSystem;
+        Footer           = SetupBaseFooter(fileSystem);
+        MainContext      = SetupBaseMainContext(fileSystem, filter);
+        FolderContext    = SetupBaseFolderContext(this, filter);
+        SeparatorContext = SetupBaseSeparatorContext(this);
+    }
 
     /// <summary> Whether this file system drawer allows drag and drop operations. </summary>
     public bool AllowDragAndDrop { get; set; } = true;
@@ -47,6 +61,26 @@ public abstract class FileSystemDrawer(MessageService messager, BaseFileSystem f
         }
     } = ISortMode.FoldersFirst;
 
+    /// <summary> The valid sort modes for this drawer. </summary>
+    public virtual IEnumerable<ISortMode> ValidSortModes
+        =>
+        [
+            ISortMode.FoldersFirst, ISortMode.Lexicographical, ISortMode.FoldersLast, ISortMode.InverseLexicographical,
+            ISortMode.InverseFoldersFirst, ISortMode.InverseFoldersLast, ISortMode.InternalOrder, ISortMode.InverseInternalOrder,
+        ];
+
+    /// <summary> Get the color expanded folders without individual colors should use. </summary>
+    public virtual Vector4 ExpandedFolderColor
+        => Im.Style[ImGuiColor.Text];
+
+    /// <summary> Get the color collapsed folders without individual colors should use. </summary>
+    public virtual Vector4 CollapsedFolderColor
+        => Im.Style[ImGuiColor.Text];
+
+    /// <summary> Get the color the folder line should use. </summary>
+    public virtual Vector4 FolderLineColor
+        => Im.Style[ImGuiColor.TextDisabled];
+
     /// <summary> An event that is invoked when the <see cref="SortMode"/> changes. </summary>
     public event Action? SortModeChanged;
 
@@ -54,7 +88,8 @@ public abstract class FileSystemDrawer(MessageService messager, BaseFileSystem f
     private static ButtonFooter SetupBaseFooter(BaseFileSystem fileSystem)
     {
         var ret = new ButtonFooter();
-        ret.Buttons.AddButton(new CreateFolderButton(fileSystem), 0);
+        ret.Buttons.AddButton(new CreateFolderButton(fileSystem),    0);
+        ret.Buttons.AddButton(new CreateSeparatorButton(fileSystem), -1);
         return ret;
     }
 
@@ -68,14 +103,35 @@ public abstract class FileSystemDrawer(MessageService messager, BaseFileSystem f
     }
 
     /// <summary> Create the default menu items available in the folder context menu. </summary>
-    private static ButtonList<IFileSystemFolder> SetupBaseFolderContext(BaseFileSystem fileSystem, IFilter filter)
+    private static ButtonList<IFileSystemFolder> SetupBaseFolderContext(FileSystemDrawer drawer, IFilter filter)
     {
         var ret = new ButtonList<IFileSystemFolder>();
-        ret.AddButton(new ExpandDescendantsButton(fileSystem, filter),   100);
-        ret.AddButton(new CollapseDescendantsButton(fileSystem, filter), 90);
-        ret.AddButton(new LockFolderButton(fileSystem),                  80);
-        ret.AddButton(new DissolveFolderButton(fileSystem),              70);
-        ret.AddButton(new RenameFolderInput(fileSystem),                 -100);
+        ret.AddButton(new ExpandDescendantsButton(drawer.FileSystem, filter),   100);
+        ret.AddButton(new CollapseDescendantsButton(drawer.FileSystem, filter), 90);
+
+        var editFolderButtons = new SubMenuButton<IFileSystemFolder>(new StringU8("Edit Folder"u8));
+        editFolderButtons.Entries.AddButton(new LockFolderButton(drawer.FileSystem),     20);
+        editFolderButtons.Entries.AddButton(new DissolveFolderButton(drawer.FileSystem), 15);
+        editFolderButtons.Entries.AddButton(new MenuSeparator<IFileSystemFolder>(),      12);
+        editFolderButtons.Entries.AddButton(new FolderColorEdits(drawer),                10);
+        editFolderButtons.Entries.AddButton(new SortModeSelector(drawer),                0);
+        ret.AddButton(editFolderButtons, 0);
+
+        ret.AddButton(new RenameFolderInput(drawer.FileSystem), -100);
+        return ret;
+    }
+
+    /// <summary> Create the default menu items available in the folder context menu. </summary>
+    private static ButtonList<IFileSystemSeparator> SetupBaseSeparatorContext(FileSystemDrawer drawer)
+    {
+        var ret = new ButtonList<IFileSystemSeparator>();
+        ret.AddButton(new SeparatorSortAsFolderButton(drawer.FileSystem), 100);
+        ret.AddButton(new SeparatorDeleteButton(drawer.FileSystem),       90);
+        ret.AddButton(new MenuSeparator<IFileSystemSeparator>(),          85);
+        ret.AddButton(new SeparatorColorEdit(drawer),                     80);
+        ret.AddButton(new MenuSeparator<IFileSystemSeparator>(),          70);
+        ret.AddButton(new SeparatorPathEdit(drawer.FileSystem),           -100);
+        ret.AddButton(new SeparatorTimestampEdit(drawer.FileSystem),      -110);
         return ret;
     }
 
@@ -115,6 +171,7 @@ public interface IFileSystemFilter<TNodeCache> : IFilter<TNodeCache>
     public bool WouldBeVisible(in IFileSystemNodeCache node)
         => node switch
         {
+            FileSystemSeparatorCache     => IsEmpty,
             FileSystemFolderCache folder => WouldBeVisible(folder),
             TNodeCache dataNode          => WouldBeVisible(in dataNode, -1),
             _                            => false,
@@ -134,7 +191,7 @@ public abstract class FileSystemDrawer<TNodeCache>(MessageService messager, Base
     where TNodeCache : IFileSystemNodeCache
 {
     /// <summary> The header containing the filter for this file system drawer. </summary>
-    public readonly FilterHeader<TNodeCache> Header = new(filter ?? NopFilter.Instance, new StringU8("筛选..."u8));
+    public readonly FilterHeader<TNodeCache> Header = new(filter ?? NopFilter.Instance, new StringU8("Filter..."u8));
 
     /// <summary> Draw the panel. </summary>
     public override void Draw()

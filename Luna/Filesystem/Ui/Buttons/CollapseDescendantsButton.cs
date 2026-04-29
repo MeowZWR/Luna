@@ -19,5 +19,5 @@ public sealed class CollapseDescendantsButton(BaseFileSystem fileSystem, IFilter
 
     /// <inheritdoc/>
     public override void DrawTooltip(in IFileSystemFolder _)
-        => Im.Text("Successively collapse all folders that descend from this folder, including itself."u8);
+        => Im.Text("依次收起此折叠组及其所有下级折叠组，包括它自己。"u8);
 }

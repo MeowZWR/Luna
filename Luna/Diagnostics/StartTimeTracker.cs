@@ -138,8 +138,8 @@ public class StartTimeTracker : IService
 
         public void Draw()
         {
-            if (UserRegex.DrawRegexInput("##filter"u8, ref _filter, "筛选..."u8, null, Im.ContentRegion.Available.X,
-                    LunaStyle.ErrorBorderColor))
+            if (UserRegex.DrawRegexInput("##filter"u8, ref _filter, "Filter..."u8, null, Im.ContentRegion.Available.X,
+                    LunaStyle.ErrorForeground))
                 UpdateFilter();
             using var table = Im.Table.Begin("t"u8, 5, TableFlags.SizingFixedFit | TableFlags.RowBackground);
             if (!table)

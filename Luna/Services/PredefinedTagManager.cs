@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Luna;
 
@@ -162,6 +163,7 @@ public abstract class PredefinedTagManager<TProvider, TObj>(BaseSaveService<TPro
 
         var ret = false;
         Im.Text("预定义标签"u8);
+        using var id = Im.Id.Push("pdt"u8);
         Im.Separator();
         _addButtonColor    = AddButtonColor;
         _removeButtonColor = RemoveButtonColor;
@@ -199,6 +201,7 @@ public abstract class PredefinedTagManager<TProvider, TObj>(BaseSaveService<TPro
             return false;
 
         Im.Text("预定义标签"u8);
+        using var id = Im.Id.Push("pdt"u8);
         Im.Separator();
 
         _addButtonColor    = AddButtonColor;
@@ -268,6 +271,7 @@ public abstract class PredefinedTagManager<TProvider, TObj>(BaseSaveService<TPro
             return;
 
         Im.Text("预定义标签"u8);
+        using var _ = Im.Id.Push("pdt"u8);
 
         using var color = new Im.ColorDisposable();
         var       cache = CacheManager.Instance.GetOrCreateCache(Im.Id.Current, () => new Cache());
@@ -353,7 +357,7 @@ public abstract class PredefinedTagManager<TProvider, TObj>(BaseSaveService<TPro
     private bool DrawColoredButton(string buttonLabel, int index, int tagIdx, bool inOther)
     {
         using var id          = Im.Id.Push(index);
-        var       buttonWidth = Im.Font.CalculateButtonSize(buttonLabel).X;
+        var       buttonWidth = ImEx.Icon.CalculateLabeledButtonSize(LunaStyle.TrueIcon, buttonLabel).X;
         // Prevent adding a new tag past the right edge of the popup
         if (buttonWidth + Im.Style.ItemSpacing.X >= Im.ContentRegion.Available.X)
             Im.Line.New();
@@ -362,7 +366,8 @@ public abstract class PredefinedTagManager<TProvider, TObj>(BaseSaveService<TPro
         using (Im.Disabled(inOther))
         {
             using var color = ImGuiColor.Button.Push(tagIdx >= 0 || inOther ? _removeButtonColor : _addButtonColor);
-            ret = Im.Button(buttonLabel);
+            ret = ImEx.Icon.LabeledButton(LunaStyle.TrueIcon, buttonLabel,
+                iconFlags: tagIdx >= 0 || inOther ? 0 : ImEx.Icon.IconFlags.HideIcon);
         }
 
         if (inOther)

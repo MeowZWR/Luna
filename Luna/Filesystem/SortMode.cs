@@ -42,7 +42,11 @@ public interface ISortMode : IEquatable<ISortMode>
 
     /// <inheritdoc/>
     bool IEquatable<ISortMode>.Equals(ISortMode? other)
-        => GetType() == other?.GetType();
+        => Equals(this, other);
+
+    /// <summary> Whether two sort modes are equal. </summary>
+    public static bool Equals(ISortMode? lhs, ISortMode? rhs)
+        => lhs is null ? rhs is null : rhs is not null && lhs.GetType() == rhs.GetType();
 
     private static class Types
     {
@@ -55,7 +59,7 @@ public interface ISortMode : IEquatable<ISortMode>
                 => "在每个折叠组中，按字典顺序排序所有子折叠组，然后按字典顺序排序所有数据节点。"u8;
 
             public IEnumerable<IFileSystemNode> GetChildren(IFileSystemFolder folder)
-                => folder.GetSubFolders().Cast<IFileSystemNode>().Concat(folder.GetLeaves());
+                => GetFolderLike(folder).Concat(GetLeaveLike(folder));
         }
 
         public struct Lexicographical : ISortMode
@@ -79,7 +83,7 @@ public interface ISortMode : IEquatable<ISortMode>
                 => "在每个折叠组中，按反字典顺序排序所有子折叠组，然后按反字典顺序排序所有数据节点。"u8;
 
             public IEnumerable<IFileSystemNode> GetChildren(IFileSystemFolder folder)
-                => folder.GetSubFolders().Cast<IFileSystemNode>().Reverse().Concat(folder.GetLeaves().Reverse());
+                => GetFolderLike(folder).Reverse().Concat(GetLeaveLike(folder)).Reverse();
         }
 
         public struct InverseLexicographical : ISortMode
@@ -103,7 +107,7 @@ public interface ISortMode : IEquatable<ISortMode>
                 => "在每个折叠组中，按字典顺序排序所有数据节点，然后按字典顺序排序所有子折叠组。"u8;
 
             public IEnumerable<IFileSystemNode> GetChildren(IFileSystemFolder folder)
-                => folder.GetLeaves().Cast<IFileSystemNode>().Concat(folder.GetSubFolders());
+                => GetLeaveLike(folder).Concat(GetFolderLike(folder));
         }
 
         public struct InverseFoldersLast : ISortMode
@@ -115,7 +119,7 @@ public interface ISortMode : IEquatable<ISortMode>
                 => "在每个折叠组中，按反字典顺序排序所有数据节点，然后按反字典顺序排序所有子折叠组。"u8;
 
             public IEnumerable<IFileSystemNode> GetChildren(IFileSystemFolder folder)
-                => folder.GetLeaves().Cast<IFileSystemNode>().Reverse().Concat(folder.GetSubFolders().Reverse());
+                => GetLeaveLike(folder).Reverse().Concat(GetFolderLike(folder)).Reverse();
         }
 
         public struct InternalOrder : ISortMode
@@ -142,4 +146,13 @@ public interface ISortMode : IEquatable<ISortMode>
                 => folder.Children.OrderByDescending(c => c.Identifier);
         }
     }
+
+    /// <summary> Get all children of a folder that behave like leaves. </summary>
+    /// <param name="folder"></param>
+    /// <returns></returns>
+    public static IEnumerable<IFileSystemNode> GetLeaveLike(IFileSystemFolder folder)
+        => folder.Children.Where(c => !c.BehavesLikeFolder);
+
+    public static IEnumerable<IFileSystemNode> GetFolderLike(IFileSystemFolder folder)
+        => folder.Children.Where(c => c.BehavesLikeFolder);
 }
