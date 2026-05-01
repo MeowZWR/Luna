@@ -26,9 +26,6 @@ public sealed unsafe class ImSharpDalamudContext : IRequiredService, IDisposable
     private readonly IUiBuilder              _uiBuilder;
     private readonly IDalamudPluginInterface _pluginInterface;
 
-    /// <summary> When true, <see cref="TrySetCustomRenderDeviceOnDraw"/> is subscribed to <see cref="IUiBuilder.Draw"/> until the device is available. </summary>
-    private bool _deferredCustomRenderDeviceOnDraw;
-
     /// <summary>
     ///   Creates an <see cref="ImSharpContext"/> and shares it through Dalamud's shared data store. <br/>
     ///   Sets up the logger for this instance of Luna. <br/>
@@ -46,17 +43,14 @@ public sealed unsafe class ImSharpDalamudContext : IRequiredService, IDisposable
 
         ImSharpConfiguration.SetLogger(logger);
 
-        EnsureCustomRenderDevice();
+        CustomRenderManager.Instance.SetDevice(uiBuilder.DeviceHandle);
 
         // Set up the default cache manager.
         _uiBuilder.DefaultFontChanged        += OnDefaultFontChanged;
         _uiBuilder.DefaultGlobalScaleChanged += OnDefaultGlobalScaleChanged;
         _uiBuilder.DefaultStyleChanged       += OnDefaultStyleChanged;
 
-        if (_deferredCustomRenderDeviceOnDraw)
-            _uiBuilder.Draw += TrySetCustomRenderDeviceOnDraw;
-
-        _uiBuilder.Draw += ImSharpPerFrame.OnUpdate;
+        _uiBuilder.Draw        += ImSharpPerFrame.OnUpdate;
         ImSharpPerFrame.Update += OnFrameworkUpdate;
         var created = false;
         var holder = pluginInterface.GetOrCreateData(_contextTag, IReadOnlyList<nint> () =>
@@ -83,33 +77,7 @@ public sealed unsafe class ImSharpDalamudContext : IRequiredService, IDisposable
         ImSharpConfiguration.SetContext(null, true);
         ImSharpConfiguration.SetLogger(null);
         _pluginInterface.RelinquishData(_contextTag);
-        if (_deferredCustomRenderDeviceOnDraw)
-            _uiBuilder.Draw -= TrySetCustomRenderDeviceOnDraw;
-
         _uiBuilder.Draw -= ImSharpPerFrame.OnUpdate;
-    }
-
-    private void EnsureCustomRenderDevice()
-    {
-        var device = _uiBuilder.DeviceHandle;
-        if (device != nint.Zero)
-        {
-            CustomRenderManager.Instance.SetDevice(device);
-            return;
-        }
-
-        _deferredCustomRenderDeviceOnDraw = true;
-    }
-
-    private void TrySetCustomRenderDeviceOnDraw()
-    {
-        var device = _uiBuilder.DeviceHandle;
-        if (device == nint.Zero)
-            return;
-
-        CustomRenderManager.Instance.SetDevice(device);
-        _uiBuilder.Draw -= TrySetCustomRenderDeviceOnDraw;
-        _deferredCustomRenderDeviceOnDraw = false;
     }
 
     /// <summary> Draw debug information about the currently configured <see cref="ImSharpContext"/>. </summary>
