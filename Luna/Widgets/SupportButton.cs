@@ -45,7 +45,7 @@ public static class SupportButton
         Active     = 0xFF492C00u,
         Background = 0xFF6B7280u,
         Hovered    = ColorParameter.Default,
-        Tooltip    = new StringU8("从零开始重启 Penumbra 教程进度。"),
+        Tooltip    = new StringU8("从零开始重启 Penumbra 教程进度。"u8),
     };
 
     private static readonly ImEx.SplitButtonData XivModArchiveData = new(new StringU8("XMA"u8))
