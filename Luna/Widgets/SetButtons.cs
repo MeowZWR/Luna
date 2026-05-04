@@ -37,7 +37,7 @@ public static class SetButtons
             Im.Button(label);
             var delete = !readOnly && control && Im.Item.RightClicked();
             if (!readOnly)
-                Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, "Hold control and right-click to delete."u8);
+                Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, "按住Ctrl并单击右键以删除。"u8);
             if (delete)
             {
                 value   &= ~bit;
@@ -56,7 +56,7 @@ public static class SetButtons
                 changed = true;
             }
 
-            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"Hold control and click to delete all {itemsDescription}.");
+            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住Ctrl并单击以删除所有 {itemsDescription}。");
         }
 
         if (universe == T.Zero || readOnly)
@@ -65,23 +65,23 @@ public static class SetButtons
         if (nonEmpty)
             TrySameLine(Im.Style.FrameHeight, ref first);
         if (ImEx.Icon.Button(LunaStyle.AddObjectIcon, StringU8.Empty))
-            Im.Popup.Open("Add"u8);
-        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"Add {itemsDescription}");
+            Im.Popup.Open("添加"u8);
+        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"添加 {itemsDescription}");
 
-        using var popup = Im.Popup.Begin("Add"u8);
+        using var popup = Im.Popup.Begin("添加"u8);
         if (!popup)
             return changed;
 
         using (Im.Disabled(!control))
         {
-            if (Im.Selectable("All"u8))
+            if (Im.Selectable("全部"u8))
             {
                 value   |= universe;
                 changed =  true;
             }
         }
 
-        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"Hold control and click to add all {itemsDescription}.");
+        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住Ctrl并单击以添加所有 {itemsDescription}。");
         Im.Separator();
 
         remainingBits = universe;
@@ -155,7 +155,7 @@ public static class SetButtons
             Im.Button(label);
             var delete = !readOnly && control && Im.Item.RightClicked();
             if (!readOnly)
-                Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, "Hold control and right-click to delete."u8);
+                Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, "按住Ctrl并单击右键以删除。"u8);
             if (delete)
             {
                 willRemove   = true;
@@ -177,7 +177,7 @@ public static class SetButtons
                 value.Clear();
                 changed = true;
             }
-            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"Hold control and click to delete all {itemsDescription}.");
+            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住Ctrl并单击以删除所有 {itemsDescription}。");
         }
 
         if (readOnly)
@@ -192,16 +192,16 @@ public static class SetButtons
         if (nonEmpty)
             TrySameLine(Im.Style.FrameHeight, ref first);
         if (ImEx.Icon.Button(LunaStyle.AddObjectIcon, StringU8.Empty))
-            Im.Popup.Open("Add"u8);
-        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"Add {itemsDescription}");
+            Im.Popup.Open("添加"u8);
+        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"添加 {itemsDescription}");
 
-        using var popup = Im.Popup.Begin("Add"u8);
+        using var popup = Im.Popup.Begin("添加"u8);
         if (!popup)
             return changed;
 
         using (Im.Disabled(!control))
         {
-            if (Im.Selectable("All"u8))
+            if (Im.Selectable("全部"u8))
             {
                 foreach (var item in universe)
                     value.Add(item);
@@ -209,7 +209,7 @@ public static class SetButtons
             }
         }
 
-        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"Hold control and click to add all {itemsDescription}.");
+        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住Ctrl并单击以添加所有 {itemsDescription}。");
         Im.Separator();
 
         foreach (var item in universe)
@@ -276,7 +276,7 @@ public static class SetButtons
                     value |= universe;
                 changed = true;
             }
-            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"Hold control and click to {((value & universe) == universe ? "delete" : "add")} all {itemsDescription}.");
+            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住Ctrl并单击以 {((value & universe) == universe ? "删除" : "添加")} 所有 {itemsDescription}。");
         }
 
         return changed;
@@ -363,7 +363,7 @@ public static class SetButtons
             TrySameLine(Im.Style.FrameHeight, ref first);
             using var color = ImGuiColor.Button.Push(nonMemberCount is 0 ? memberBackground : nonMemberBackground);
             if (ImEx.Icon.Button(LunaStyle.ToggleBulkIcon,
-                    $"Hold control and click to {(nonMemberCount is 0 ? "delete" : "add")} all {itemsDescription}.",
+                    $"按住Ctrl并单击以 {(nonMemberCount is 0 ? "删除" : "添加")} 所有 {itemsDescription}。",
                     !Im.Io.KeyControl))
             {
                 if (nonMemberCount is 0)
