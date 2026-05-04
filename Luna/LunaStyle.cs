@@ -96,6 +96,12 @@ public static partial class LunaStyle
     /// <summary> The icon that should be used for things that are unlocked. </summary>
     public static readonly AwesomeIcon UnlockedIcon = FontAwesomeIcon.LockOpen;
 
+    /// <summary> The icon that should be used to represent a linked or persistent association. </summary>
+    public static readonly AwesomeIcon LinkIcon = FontAwesomeIcon.Link;
+
+    /// <summary> The icon that should be used to represent an unlinked or non-persistent association. </summary>
+    public static readonly AwesomeIcon UnlinkIcon = FontAwesomeIcon.Unlink;
+
     /// <summary> The icon that should be used for buttons that move to the next object. </summary>
     public static readonly AwesomeIcon NextIcon = FontAwesomeIcon.ArrowCircleRight;
 
