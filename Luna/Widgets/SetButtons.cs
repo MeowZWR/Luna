@@ -19,7 +19,6 @@ public static class SetButtons
         var first    = true;
         var changed  = false;
         var nonEmpty = value != T.Zero;
-        var control  = Im.Io.KeyControl;
 
         universe &= ~value;
 
@@ -35,9 +34,9 @@ public static class SetButtons
             var label = toLabel(bit);
             TrySameLine(Im.Font.CalculateButtonSize(label).X, ref first);
             Im.Button(label);
-            var delete = !readOnly && control && Im.Item.RightClicked();
+            var delete = !readOnly && LunaStyle.Modifier.Misclick && Im.Item.RightClicked();
             if (!readOnly)
-                Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, "按住Ctrl并单击右键以删除。"u8);
+                Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住 {LunaStyle.Modifier.Misclick} 并单击右键以删除。");
             if (delete)
             {
                 value   &= ~bit;
@@ -50,13 +49,13 @@ public static class SetButtons
         if (nonEmpty && !readOnly)
         {
             TrySameLine(Im.Style.FrameHeight, ref first);
-            if (ImEx.Icon.Button(LunaStyle.DeleteIcon, StringU8.Empty, !control))
+            if (ImEx.Icon.Button(LunaStyle.DeleteIcon, StringU8.Empty, !LunaStyle.Modifier.Destructive))
             {
                 value   = T.Zero;
                 changed = true;
             }
 
-            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住Ctrl并单击以删除所有 {itemsDescription}。");
+            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住 {LunaStyle.Modifier.Destructive} 并单击以删除所有 {itemsDescription}。");
         }
 
         if (universe == T.Zero || readOnly)
@@ -72,7 +71,7 @@ public static class SetButtons
         if (!popup)
             return changed;
 
-        using (Im.Disabled(!control))
+        using (Im.Disabled(!LunaStyle.Modifier.Destructive))
         {
             if (Im.Selectable("全部"u8))
             {
@@ -81,7 +80,7 @@ public static class SetButtons
             }
         }
 
-        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住Ctrl并单击以添加所有 {itemsDescription}。");
+        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住 {LunaStyle.Modifier.Destructive} 并单击以添加所有 {itemsDescription}。");
         Im.Separator();
 
         remainingBits = universe;
@@ -89,7 +88,7 @@ public static class SetButtons
         {
             // Extract the least significant bit.
             var bit = unchecked(remainingBits & -remainingBits);
-            if (Im.Selectable(toLabel(bit), flags: control && bit != universe ? SelectableFlags.NoAutoClosePopups : 0))
+            if (Im.Selectable(toLabel(bit), flags: LunaStyle.Modifier.Add && bit != universe ? SelectableFlags.NoAutoClosePopups : 0))
             {
                 value   |= bit;
                 changed =  true;
@@ -110,7 +109,7 @@ public static class SetButtons
     {
         if (sizeof(TEnum) is 1)
             return DrawCombo(id, ref Unsafe.As<TEnum, byte>(ref value), Unsafe.BitCast<TEnum, byte>(universe),
-            value => toLabel(Unsafe.BitCast<byte, TEnum>(value)), itemsDescription, readOnly);
+                value => toLabel(Unsafe.BitCast<byte, TEnum>(value)), itemsDescription, readOnly);
         if (sizeof(TEnum) is 2)
             return DrawCombo(id, ref Unsafe.As<TEnum, ushort>(ref value), Unsafe.BitCast<TEnum, ushort>(universe),
                 value => toLabel(Unsafe.BitCast<ushort, TEnum>(value)), itemsDescription, readOnly);
@@ -139,7 +138,6 @@ public static class SetButtons
         var first    = true;
         var changed  = false;
         var nonEmpty = value.Count > 0;
-        var control  = Im.Io.KeyControl;
 
         using var _     = Im.Id.Push(ref id);
         using var group = Im.Group();
@@ -153,9 +151,9 @@ public static class SetButtons
             var label = toLabel(item);
             TrySameLine(Im.Font.CalculateButtonSize(label).X, ref first);
             Im.Button(label);
-            var delete = !readOnly && control && Im.Item.RightClicked();
+            var delete = !readOnly && LunaStyle.Modifier.Misclick && Im.Item.RightClicked();
             if (!readOnly)
-                Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, "按住Ctrl并单击右键以删除。"u8);
+                Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住 {LunaStyle.Modifier.Misclick} 并单击右键以删除。");
             if (delete)
             {
                 willRemove   = true;
@@ -172,12 +170,12 @@ public static class SetButtons
         if (nonEmpty && !readOnly)
         {
             TrySameLine(Im.Style.FrameHeight, ref first);
-            if (ImEx.Icon.Button(LunaStyle.DeleteIcon, StringU8.Empty, !control))
+            if (ImEx.Icon.Button(LunaStyle.DeleteIcon, StringU8.Empty, !LunaStyle.Modifier.Destructive))
             {
                 value.Clear();
                 changed = true;
             }
-            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住Ctrl并单击以删除所有 {itemsDescription}。");
+            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住 {LunaStyle.Modifier.Destructive} 并单击以删除所有 {itemsDescription}。");
         }
 
         if (readOnly)
@@ -199,7 +197,7 @@ public static class SetButtons
         if (!popup)
             return changed;
 
-        using (Im.Disabled(!control))
+        using (Im.Disabled(!LunaStyle.Modifier.Destructive))
         {
             if (Im.Selectable("全部"u8))
             {
@@ -209,12 +207,13 @@ public static class SetButtons
             }
         }
 
-        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住Ctrl并单击以添加所有 {itemsDescription}。");
+        Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住 {LunaStyle.Modifier.Destructive} 并单击以添加所有 {itemsDescription}。");
         Im.Separator();
 
         foreach (var item in universe)
         {
-            if (!value.Contains(item) && Im.Selectable(toLabel(item), flags: control && count is 1 ? SelectableFlags.NoAutoClosePopups : 0))
+            if (!value.Contains(item)
+             && Im.Selectable(toLabel(item), flags: LunaStyle.Modifier.Add && count is 1 ? SelectableFlags.NoAutoClosePopups : 0))
             {
                 value.Add(item);
                 changed = true;
@@ -268,7 +267,7 @@ public static class SetButtons
         {
             TrySameLine(Im.Style.FrameHeight, ref first);
             using var color = ImGuiColor.Button.Push((value & universe) == universe ? memberBackground : nonMemberBackground);
-            if (ImEx.Icon.Button(LunaStyle.ToggleBulkIcon, StringU8.Empty, !Im.Io.KeyControl))
+            if (ImEx.Icon.Button(LunaStyle.ToggleBulkIcon, StringU8.Empty, !LunaStyle.Modifier.Destructive))
             {
                 if ((value & universe) == universe)
                     value = T.Zero;
@@ -276,7 +275,7 @@ public static class SetButtons
                     value |= universe;
                 changed = true;
             }
-            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住Ctrl并单击以 {((value & universe) == universe ? "删除" : "添加")} 所有 {itemsDescription}。");
+            Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"按住 {LunaStyle.Modifier.Destructive} 并单击以 {((value & universe) == universe ? "删除" : "添加")} 所有 {itemsDescription}。");
         }
 
         return changed;
@@ -291,13 +290,18 @@ public static class SetButtons
         where TEnum : unmanaged, Enum
     {
         if (sizeof(TEnum) is 1)
-            return DrawCheckables(id, ref Unsafe.As<TEnum, byte>(ref value), Unsafe.BitCast<TEnum, byte>(universe), value => toLabel(Unsafe.BitCast<byte, TEnum>(value)), itemsDescription, readOnly, in memberBackground, in nonMemberBackground);
+            return DrawCheckables(id, ref Unsafe.As<TEnum, byte>(ref value), Unsafe.BitCast<TEnum, byte>(universe),
+                value => toLabel(Unsafe.BitCast<byte, TEnum>(value)), itemsDescription, readOnly, in memberBackground, in nonMemberBackground);
         if (sizeof(TEnum) is 2)
-            return DrawCheckables(id, ref Unsafe.As<TEnum, ushort>(ref value), Unsafe.BitCast<TEnum, ushort>(universe), value => toLabel(Unsafe.BitCast<ushort, TEnum>(value)), itemsDescription, readOnly, in memberBackground, in nonMemberBackground);
+            return DrawCheckables(id, ref Unsafe.As<TEnum, ushort>(ref value), Unsafe.BitCast<TEnum, ushort>(universe),
+                value => toLabel(Unsafe.BitCast<ushort, TEnum>(value)), itemsDescription, readOnly, in memberBackground,
+                in nonMemberBackground);
         if (sizeof(TEnum) is 4)
-            return DrawCheckables(id, ref Unsafe.As<TEnum, uint>(ref value), Unsafe.BitCast<TEnum, uint>(universe), value => toLabel(Unsafe.BitCast<uint, TEnum>(value)), itemsDescription, readOnly, in memberBackground, in nonMemberBackground);
+            return DrawCheckables(id, ref Unsafe.As<TEnum, uint>(ref value), Unsafe.BitCast<TEnum, uint>(universe),
+                value => toLabel(Unsafe.BitCast<uint, TEnum>(value)), itemsDescription, readOnly, in memberBackground, in nonMemberBackground);
         if (sizeof(TEnum) is 8)
-            return DrawCheckables(id, ref Unsafe.As<TEnum, ulong>(ref value), Unsafe.BitCast<TEnum, ulong>(universe), value => toLabel(Unsafe.BitCast<ulong, TEnum>(value)), itemsDescription, readOnly, in memberBackground, in nonMemberBackground);
+            return DrawCheckables(id, ref Unsafe.As<TEnum, ulong>(ref value), Unsafe.BitCast<TEnum, ulong>(universe),
+                value => toLabel(Unsafe.BitCast<ulong, TEnum>(value)), itemsDescription, readOnly, in memberBackground, in nonMemberBackground);
 
         throw new ArgumentException($"Invalid Enum type {typeof(TEnum)} has size {sizeof(TEnum)} which is not supported.");
     }
@@ -363,16 +367,14 @@ public static class SetButtons
             TrySameLine(Im.Style.FrameHeight, ref first);
             using var color = ImGuiColor.Button.Push(nonMemberCount is 0 ? memberBackground : nonMemberBackground);
             if (ImEx.Icon.Button(LunaStyle.ToggleBulkIcon,
-                    $"按住Ctrl并单击以 {(nonMemberCount is 0 ? "删除" : "添加")} 所有 {itemsDescription}。",
-                    !Im.Io.KeyControl))
+                    $"按住 {LunaStyle.Modifier.Destructive} 并单击以 {(nonMemberCount is 0 ? "删除" : "添加")} 所有 {itemsDescription}。",
+                    !LunaStyle.Modifier.Destructive))
             {
                 if (nonMemberCount is 0)
                     value.Clear();
                 else
-                {
                     foreach (var item in universe)
                         value.Add(item);
-                }
 
                 changed = true;
             }

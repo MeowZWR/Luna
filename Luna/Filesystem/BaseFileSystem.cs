@@ -259,6 +259,18 @@ public class BaseFileSystem
         Changed.Invoke(new FileSystemChanged.Arguments(FileSystemChangeType.FolderChanged, node, null, null));
     }
 
+    /// <summary> Change the separator behavior of a folder. </summary>
+    /// <param name="node"> The folder node. If this is not a folder, nothing is done. </param>
+    /// <param name="isSeparator"> The new separator state. If this is the same as before, nothing is done. </param>
+    public void ChangeFolderSeparatorState(IFileSystemNode node, bool isSeparator)
+    {
+        if (node is not FileSystemFolder folder || folder.DrawAsSeparator == isSeparator)
+            return;
+
+        folder.DrawAsSeparator = isSeparator;
+        Changed.Invoke(new FileSystemChanged.Arguments(FileSystemChangeType.FolderChanged, node, null, null));
+    }
+
     /// <summary> Change the associated sort mode of a folder. </summary>
     /// <param name="node"> The folder node. If this is not a folder, nothing is done. </param>
     /// <param name="sortMode"> The new sort mode to use for the direct children of this folder, or null if it should adhere to the default sort mode. </param>
@@ -617,7 +629,8 @@ public class BaseFileSystem
             return Result.InvalidOperation;
 
         newName = newName.FixName();
-        if (_nameComparer.BaseComparer.Compare(newName, node.Name) is 0)
+        // Do not use comparer here since we want to be able to rename case.
+        if (newName == node.Name)
             return Result.SuccessNothingDone;
 
         var newIdx = Search(node.Parent, newName);
@@ -1003,7 +1016,7 @@ public class BaseFileSystem
         var oldPath = node.FullPath;
         if (node.Parent!.IsRoot)
         {
-            node.FullPath   = fixName ? newName.FixName().ToString() : newName.ToString();
+            node.FullPath   = fixName ? newName.FixName() : newName.ToString();
             node.NameOffset = 0;
         }
         else
