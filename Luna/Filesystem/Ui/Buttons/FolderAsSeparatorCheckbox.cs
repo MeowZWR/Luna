@@ -11,11 +11,11 @@ public sealed class FolderAsSeparatorCheckbox(FileSystemDrawer drawer) : BaseBut
     /// <inheritdoc/>
     public override bool DrawMenuItem(in IFileSystemFolder data)
     {
-        if (Im.Checkbox("Draw Folder as Separator"u8, data.DrawAsSeparator))
+        if (Im.Checkbox("显示为分隔符"u8, data.DrawAsSeparator))
             drawer.FileSystem.ChangeFolderSeparatorState(data, !data.DrawAsSeparator);
 
         Im.Tooltip.OnHover(
-            "When this is enabled, a folder will instead be displayed as a separator line using the expanded color. It will always be expanded and all its children will be shown under the separator but not indented."u8);
+            "启用后，折叠组将显示为分隔符，使用展开颜色。它将始终展开，所有子项将显示在分隔符下，但不缩进。"u8);
         return false;
     }
 }
