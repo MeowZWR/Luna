@@ -109,7 +109,7 @@ public abstract class FileSystemDrawer : IPanel
         ret.AddButton(new ExpandDescendantsButton(drawer.FileSystem, filter),   100);
         ret.AddButton(new CollapseDescendantsButton(drawer.FileSystem, filter), 90);
 
-        var editFolderButtons = new SubMenuButton<IFileSystemFolder>(new StringU8("Edit Folder"u8));
+        var editFolderButtons = new SubMenuButton<IFileSystemFolder>(new StringU8("编辑折叠组"u8));
         editFolderButtons.Entries.AddButton(new LockFolderButton(drawer.FileSystem),     20);
         editFolderButtons.Entries.AddButton(new DissolveFolderButton(drawer.FileSystem), 15);
         editFolderButtons.Entries.AddButton(new MenuSeparator<IFileSystemFolder>(),      12);

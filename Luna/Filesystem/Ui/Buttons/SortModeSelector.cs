@@ -6,12 +6,12 @@ public class SortModeSelector(FileSystemDrawer drawer) : BaseButton<IFileSystemF
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label(in IFileSystemFolder data)
-        => "Sort Mode"u8;
+        => "排序模式"u8;
 
     /// <inheritdoc/>
     public override bool DrawMenuItem(in IFileSystemFolder data)
     {
-        if (!SortModeCombo.DrawCombo(drawer.ValidSortModes, "Individual Folder Sorting"u8, data.SortMode, out var newSortMode, true,
+        if (!SortModeCombo.DrawCombo(drawer.ValidSortModes, "单个折叠组排序"u8, data.SortMode, out var newSortMode, true,
                 180 * Im.Style.GlobalScale))
             return false;
 

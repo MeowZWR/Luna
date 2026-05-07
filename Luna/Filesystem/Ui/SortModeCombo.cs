@@ -15,13 +15,13 @@ public static class SortModeCombo
         float width)
     {
         Im.Item.SetNextWidth(width);
-        var       name  = currentSortMode is null ? "Use Global Sorting"u8 : currentSortMode.Name;
+        var       name  = currentSortMode is null ? "使用全局排序"u8 : currentSortMode.Name;
         var       ret   = false;
         using var combo = Im.Combo.Begin(label, name);
         newSortMode = null;
         if (withUseGlobal && currentSortMode is not null)
         {
-            Im.Tooltip.OnHover("Control + Right-Click to remove individual sort mode and use global sorting.");
+            Im.Tooltip.OnHover("Control + 右键点击以移除单个排序模式并使用全局排序。"u8);
             if (Im.Item.RightClicked() && Im.Io.KeyControl)
                 ret = true;
         }
@@ -32,10 +32,10 @@ public static class SortModeCombo
         if (withUseGlobal)
 
         {
-            if (Im.Selectable("Use Global Sorting"u8, currentSortMode is null) && currentSortMode is not null)
+            if (Im.Selectable("使用全局排序"u8, currentSortMode is null) && currentSortMode is not null)
                 ret = true;
 
-            Im.Tooltip.OnHover("Use the sort mode defined for the entire file system and no custom sort mode for this folder."u8);
+            Im.Tooltip.OnHover("使用整个文件系统的排序模式，不为此折叠组应用自定义排序模式。"u8);
         }
 
         foreach (var val in modes)

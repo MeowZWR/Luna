@@ -6,7 +6,7 @@ public sealed class FolderColorEdits(FileSystemDrawer drawer) : BaseButton<IFile
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label(in IFileSystemFolder data)
-        => "Color Edits"u8;
+        => "颜色编辑"u8;
 
     /// <inheritdoc/>
     public override bool DrawMenuItem(in IFileSystemFolder data)
@@ -15,13 +15,13 @@ public sealed class FolderColorEdits(FileSystemDrawer drawer) : BaseButton<IFile
         if (ImEx.IconCheckbox("##defExp"u8, LunaStyle.LockedIcon, data.ExpandedColor.IsDefault, out var isDefault))
             drawer.FileSystem.ChangeFolderExpandedColor(data, isDefault ? ColorParameter.Default : expandedColor);
 
-        Im.Tooltip.OnHover(isDefault ? "Use the custom color configured here."u8 : "Use the globally set color for collapsed folders."u8);
+        Im.Tooltip.OnHover(isDefault ? "使用此处配置的自定义颜色。"u8 : "使用全局设置的折叠组颜色。"u8);
 
         Im.Line.SameInner();
         using (Im.Disabled(isDefault))
         {
             var color = data.ExpandedColor.Color?.ToVector() ?? expandedColor;
-            if (Im.Color.Editor("Expanded Folder Color"u8, ref color, ColorEditorFlags.AlphaPreviewHalf | ColorEditorFlags.NoInputs))
+            if (Im.Color.Editor("展开折叠组颜色"u8, ref color, ColorEditorFlags.AlphaPreviewHalf | ColorEditorFlags.NoInputs))
                 drawer.FileSystem.ChangeFolderExpandedColor(data, color);
         }
 
@@ -29,13 +29,13 @@ public sealed class FolderColorEdits(FileSystemDrawer drawer) : BaseButton<IFile
         if (ImEx.IconCheckbox("##defColl"u8, LunaStyle.LockedIcon, data.CollapsedColor.IsDefault, out isDefault))
             drawer.FileSystem.ChangeFolderCollapsedColor(data, isDefault ? ColorParameter.Default : collapsedColor);
 
-        Im.Tooltip.OnHover(isDefault ? "Use the custom color configured here."u8 : "Use the globally set color for collapsed folders."u8);
+        Im.Tooltip.OnHover(isDefault ? "使用此处配置的自定义颜色。"u8 : "使用全局设置的折叠组颜色。"u8);
 
         Im.Line.SameInner();
         using (Im.Disabled(isDefault))
         {
             var color = data.CollapsedColor.Color?.ToVector() ?? collapsedColor;
-            if (Im.Color.Editor("Collapsed Folder Color"u8, ref color, ColorEditorFlags.AlphaPreviewHalf | ColorEditorFlags.NoInputs))
+            if (Im.Color.Editor("收起折叠组颜色"u8, ref color, ColorEditorFlags.AlphaPreviewHalf | ColorEditorFlags.NoInputs))
                 drawer.FileSystem.ChangeFolderCollapsedColor(data, color);
         }
 
