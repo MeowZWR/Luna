@@ -42,7 +42,7 @@ public sealed class ModifierHelper
         {
             Modifier        = modifier;
             Name            = new StringPair($"{modifier}");
-            _defaultTooltip = new StringU8($"Hold {Name} while clicking to ");
+            _defaultTooltip = new StringU8($"按住 {Name} 键并点击以");
             Active          = false;
         }
 
@@ -52,7 +52,7 @@ public sealed class ModifierHelper
         public void Tooltip(ReadOnlySpan<byte> action)
         {
             if (!Active)
-                Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"{_defaultTooltip} {action}.");
+                Im.Tooltip.OnHover(HoveredFlags.AllowWhenDisabled, $"{_defaultTooltip} {action}。");
         }
 
         /// <inheritdoc cref="Tooltip(ReadOnlySpan{byte})"/>
