@@ -14,7 +14,7 @@ public sealed class CreateSeparatorButton(BaseFileSystem fileSystem) : BaseIconB
 
     /// <inheritdoc/>
     public override void DrawTooltip()
-        => Im.Text("Create a new separator line. Can contain '/' to create a directory structure. The name will only be used for sorting."u8);
+        => Im.Text("新建一个分隔符。可以包含 '/' 创建目录结构。名称仅用于排序。"u8);
 
     /// <inheritdoc/>
     public override bool HasTooltip
