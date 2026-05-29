@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
@@ -15,6 +16,7 @@ public static class JsonFunctions
     {
         WriteIndented       = true,
         AllowTrailingCommas = true,
+        Encoder             = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     /// <summary> The default JSON Writer options we use. </summary>
@@ -24,6 +26,7 @@ public static class JsonFunctions
         IndentCharacter = ' ',
         IndentSize      = 4,
         NewLine         = "\n",
+        Encoder         = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     /// <summary> The default JSON Writer options we use. </summary>
@@ -33,6 +36,7 @@ public static class JsonFunctions
         Indented       = false,
         IndentSize     = 0,
         NewLine        = "\n",
+        Encoder        = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     /// <summary> The default JSON Reader options we use. </summary>
@@ -157,6 +161,18 @@ public static class JsonFunctions
     /// <param name="reader"> The reader. If the requested property is the first encountered property, its position will be incremented, otherwise it will stay the same. </param>
     extension(scoped ref Utf8JsonReader reader)
     {
+        /// <summary> Create a sub-reader utility on the current value token, copying the reader at the current location. </summary>
+        /// <remarks>
+        ///   Use <see cref="Utf8JsonObjectReader.Read"/> for reading within the current value.<br/>
+        ///   If the current value is an object or an array, this will return true until the end of this object is reached.<br/>
+        ///   If it is a value type (null, a number, a string, or true or false), it will never return true.<br/>
+        ///   If it is any other token type, it will throw on construction.<br/>
+        ///   After returning false, if it started on an object or array, the cursor will be located on the <see cref="JsonTokenType.EndObject"/> or <see cref="JsonTokenType.EndArray"/> token.<br/>
+        ///   It will also throw if it drops out of 
+        /// </remarks>
+        public Utf8JsonObjectReader CreateObjectReader()
+            => new(reader);
+
         /// <summary> Create a sub-reader utility on the current value token. </summary>
         /// <remarks>
         ///   Use <see cref="Utf8JsonObjectReader.Read"/> for reading within the current value.<br/>
@@ -165,7 +181,7 @@ public static class JsonFunctions
         ///   If it is any other token type, it will throw on construction. <br/>
         ///   After returning false, if it started on an object or array, the cursor will be located on the <see cref="JsonTokenType.EndObject"/> or <see cref="JsonTokenType.EndArray"/> token.
         /// </remarks>
-        public Utf8JsonObjectReader CreateObjectReader()
+        public Utf8JsonObjectLimit CreateObjectLimit()
             => new(reader);
 
         /// <summary> Check whether the current property name token corresponds to the given property and has a following value. </summary>
@@ -192,7 +208,7 @@ public static class JsonFunctions
         /// <returns> True if the property names correspond, false otherwise. </returns>
         /// <exception cref="JsonException"> If the property matches but has no following value token to read or is not the start of an object. </exception>
         [MethodImpl(ImSharpConfiguration.OptInl)]
-        public bool ObjectProperty(ReadOnlySpan<byte> propertyName, out Utf8JsonObjectReader objectReader, bool allowNull = false)
+        public bool ObjectProperty(ReadOnlySpan<byte> propertyName, out Utf8JsonObjectLimit objectReader, bool allowNull = false)
         {
             Debug.Assert(reader.TokenType is JsonTokenType.PropertyName);
             if (!reader.ValueTextEquals(propertyName))
@@ -206,13 +222,13 @@ public static class JsonFunctions
 
             if (reader.TokenType is JsonTokenType.StartObject)
             {
-                objectReader = new Utf8JsonObjectReader(reader);
+                objectReader = new Utf8JsonObjectLimit(reader);
                 return true;
             }
 
             if (allowNull && reader.TokenType is JsonTokenType.Null)
             {
-                objectReader = new Utf8JsonObjectReader(reader);
+                objectReader = new Utf8JsonObjectLimit(reader);
                 return true;
             }
 
@@ -226,7 +242,7 @@ public static class JsonFunctions
         /// <returns> True if the property names correspond, false otherwise. </returns>
         /// <exception cref="JsonException"> If the property matches but has no following value token to read or is not the start of an object or null if allowed. </exception>
         [MethodImpl(ImSharpConfiguration.OptInl)]
-        public bool ArrayProperty(ReadOnlySpan<byte> propertyName, out Utf8JsonObjectReader arrayReader, bool allowNull = false)
+        public bool ArrayProperty(ReadOnlySpan<byte> propertyName, out Utf8JsonObjectLimit arrayReader, bool allowNull = false)
         {
             Debug.Assert(reader.TokenType is JsonTokenType.PropertyName);
             if (!reader.ValueTextEquals(propertyName))
@@ -240,13 +256,13 @@ public static class JsonFunctions
 
             if (reader.TokenType is JsonTokenType.StartArray)
             {
-                arrayReader = new Utf8JsonObjectReader(reader);
+                arrayReader = new Utf8JsonObjectLimit(reader);
                 return true;
             }
 
             if (allowNull && reader.TokenType is JsonTokenType.Null)
             {
-                arrayReader = new Utf8JsonObjectReader(reader);
+                arrayReader = new Utf8JsonObjectLimit(reader);
                 return true;
             }
 
@@ -268,7 +284,7 @@ public static class JsonFunctions
             if (!reader.Read())
                 throw new JsonException($"Unexpected end after boolean property {Encoding.UTF8.GetString(propertyName)}.");
 
-            if (reader.TryReadBoolean(out value))
+            if (!reader.TryReadBoolean(out value))
                 throw new JsonException(
                     $"Unexpected {reader.TokenType} value for boolean property {Encoding.UTF8.GetString(propertyName)}.");
 
@@ -298,6 +314,41 @@ public static class JsonFunctions
                 ? true
                 : throw new JsonException(
                     $"Unexpected {reader.TokenType} value for numeric property {Encoding.UTF8.GetString(propertyName)}.");
+        }
+
+        /// <summary> Check whether the current property name token corresponds to the given property and has numerical value. </summary>
+        /// <param name="propertyName"> The property name to check for. </param>
+        /// <param name="value"> The parsed number on success. </param>
+        /// <returns> True if the property names correspond, false otherwise. </returns>
+        /// <exception cref="JsonException"> If the property matches but has no following value token to read, or if the value token is not a number. </exception>
+        [MethodImpl(ImSharpConfiguration.OptInl)]
+        public bool NumberProperty<TNumber>(ReadOnlySpan<byte> propertyName, out TNumber? value)
+            where TNumber : unmanaged, INumber<TNumber>
+        {
+            Debug.Assert(reader.TokenType is JsonTokenType.PropertyName);
+            if (!reader.ValueTextEquals(propertyName))
+            {
+                value = null;
+                return false;
+            }
+
+            if (!reader.Read())
+                throw new JsonException($"Unexpected end after numeric property {Encoding.UTF8.GetString(propertyName)}.");
+
+            if (reader.TokenType is JsonTokenType.Null)
+            {
+                value = null;
+                return true;
+            }
+
+            if (reader.TryReadNumber(out TNumber number))
+            {
+                value = number;
+                return true;
+            }
+
+            throw new JsonException(
+                $"Unexpected {reader.TokenType} value for numeric property {Encoding.UTF8.GetString(propertyName)}.");
         }
 
         /// <summary> Check whether the current property name token corresponds to the given property and has a textual enumeration value. </summary>
@@ -426,21 +477,20 @@ public static class JsonFunctions
         public PeekError TryPeekStringProperty(ReadOnlySpan<byte> property, out StringU8 value)
         {
             // We create a copy of the reader to be independent of the order of properties.
-            var copy = reader;
+            var objectReader = reader.CreateObjectReader();
             value = StringU8.Empty;
             var nonEnumPropertyEncountered = false;
             var success                    = false;
-            var objectReader               = copy.CreateObjectReader();
             // Read all tokens.
-            while (objectReader.Read(ref copy))
+            while (objectReader.Read())
             {
                 // If the token is a property, check if it is the type property.
-                if (copy.TokenType is JsonTokenType.PropertyName)
+                if (objectReader.Reader.TokenType is JsonTokenType.PropertyName)
                 {
-                    if (copy.ValueTextEquals(property))
+                    if (objectReader.Reader.ValueTextEquals(property))
                     {
                         // Type properties will be parsed, If this all succeeds, break out of the loop.
-                        if (!copy.Read() || !copy.TryReadUtf8String(out value))
+                        if (!objectReader.Read() || !objectReader.Reader.TryReadUtf8String(out value))
                             return PeekError.Invalid;
 
                         success = true;
@@ -448,24 +498,24 @@ public static class JsonFunctions
                     }
 
                     // If we encounter a different property first, skip it and mark that.
-                    copy.Skip();
+                    objectReader.Reader.Skip();
                     nonEnumPropertyEncountered = true;
                 }
                 // If we encounter a different object, skip it and mark that. (This should be invalid JSON?)
-                else if (copy.TokenType is JsonTokenType.StartObject)
+                else if (objectReader.Reader.TokenType is JsonTokenType.StartObject)
                 {
-                    copy.Skip();
+                    objectReader.Reader.Skip();
                     nonEnumPropertyEncountered = true;
                 }
             }
 
             // We iterated all tokens without encountering a type property or an end.
             if (!success)
-                return copy.TokenType is JsonTokenType.EndObject ? PeekError.Missing : PeekError.Malformed;
+                return objectReader.Reader.TokenType is JsonTokenType.EndObject ? PeekError.Missing : PeekError.Malformed;
 
             // If we did not skip any properties, we can use the copied readers position.
             if (!nonEnumPropertyEncountered)
-                reader = copy;
+                reader = objectReader.Reader;
 
             return PeekError.Success;
         }
@@ -482,30 +532,10 @@ public static class JsonFunctions
                 return allowNull && reader.TokenType is JsonTokenType.Null;
             }
 
-            if (!reader.HasValueSequence)
-            {
-                var array = new byte[reader.ValueSpan.Length + 1];
-                array[reader.ValueSpan.Length] = 0;
-                reader.ValueSpan.CopyTo(array);
-                text = StringU8.CreateUnchecked(array.AsMemory(..^1));
-                return true;
-            }
-
-            var seq    = reader.ValueSequence;
-            var length = 1;
-            foreach (var span in seq)
-                length += span.Length;
-
-            var ret = new byte[length];
-            ret[^1] = 0;
-            var tmp = ret.AsMemory();
-            foreach (var span in seq)
-            {
-                span.CopyTo(tmp);
-                tmp = tmp[span.Length..];
-            }
-
-            text = StringU8.CreateUnchecked(ret.AsMemory(..^1));
+            var array = new byte[reader.ValueSpan.Length + 1];
+            var bytes = reader.CopyString(array);
+            array[bytes] = 0;
+            text         = StringU8.CreateUnchecked(array.AsMemory(0, bytes));
             return true;
         }
 
@@ -563,7 +593,7 @@ public static class JsonFunctions
                 throw new JsonException($"Expected string array but got {reader.TokenType}.");
 
             var ret   = new List<string?>();
-            var array = reader.CreateObjectReader();
+            var array = reader.CreateObjectLimit();
             while (array.Read(ref reader))
             {
                 if (allowsNullEntries && reader.TokenType is JsonTokenType.Null)
@@ -598,7 +628,7 @@ public static class JsonFunctions
                 throw new JsonException($"Expected string array but got {reader.TokenType}.");
 
             var ret   = new List<StringU8>();
-            var array = reader.CreateObjectReader();
+            var array = reader.CreateObjectLimit();
             while (array.Read(ref reader))
             {
                 if (reader.TokenType is JsonTokenType.EndArray)
@@ -626,7 +656,7 @@ public static class JsonFunctions
         /// <param name="allowsNullArray"> Whether the array itself may be null or not. </param>
         /// <returns> Null if the array is null and this is allowed, a list of GUID values otherwise. </returns>
         /// <exception cref="JsonException"> Throws if the array is null and this is not allowed, or if the JSON is malformed or not an array of strings. </exception>
-        public List<Guid>? ReadGuidArray(bool allowsNullArray = false)
+        public List<Guid>? ReadGuidArray(bool allowsNullArray = true)
         {
             if (allowsNullArray && reader.TokenType is JsonTokenType.Null)
                 return null;
@@ -635,7 +665,7 @@ public static class JsonFunctions
                 throw new JsonException($"Expected GUID array but got {reader.TokenType}.");
 
             var ret   = new List<Guid>();
-            var array = reader.CreateObjectReader();
+            var array = reader.CreateObjectLimit();
             while (array.Read(ref reader))
             {
                 if (reader.TokenType is JsonTokenType.EndArray)
@@ -658,7 +688,7 @@ public static class JsonFunctions
         /// <param name="allowsNullArray"> Whether the array itself may be null or not. </param>
         /// <returns> Null if the array is null and this is allowed, a list of parsed numbers otherwise. </returns>
         /// <exception cref="JsonException"> Throws if the array is null and this is not allowed, or if the JSON is malformed or not an array of numbers. </exception>
-        public List<TNumber>? ReadNumberArray<TNumber>(bool allowsNullArray = false) where TNumber : unmanaged, INumber<TNumber>
+        public List<TNumber>? ReadNumberArray<TNumber>(bool allowsNullArray = true) where TNumber : unmanaged, INumber<TNumber>
         {
             if (allowsNullArray && reader.TokenType is JsonTokenType.Null)
                 return null;
@@ -667,7 +697,7 @@ public static class JsonFunctions
                 throw new JsonException($"Expected number array but got {reader.TokenType}.");
 
             var ret   = new List<TNumber>();
-            var array = reader.CreateObjectReader();
+            var array = reader.CreateObjectLimit();
             while (array.Read(ref reader))
             {
                 if (reader.TokenType is JsonTokenType.EndArray)
@@ -694,7 +724,7 @@ public static class JsonFunctions
                 throw new JsonException($"Expected string array of {typeof(TEnum).Name} values but got {reader.TokenType}.");
 
             TEnum ret   = default;
-            var   array = reader.CreateObjectReader();
+            var   array = reader.CreateObjectLimit();
             while (array.Read(ref reader))
             {
                 if (reader.TokenType is JsonTokenType.EndArray)
@@ -895,7 +925,7 @@ public static class JsonFunctions
         /// <summary> Skip to the end of the current object. </summary>
         public void SkipCurrentObject()
         {
-            var objectReader = reader.CreateObjectReader();
+            var objectReader = reader.CreateObjectLimit();
             while (objectReader.Read(ref reader))
                 ;
         }
@@ -1453,14 +1483,18 @@ public static class JsonFunctions
 }
 
 /// <summary> A helper struct to parse within a single property value or object. </summary>
-/// <param name="reader"> The reader to base this in. </param>
-public readonly ref struct Utf8JsonObjectReader(scoped in Utf8JsonReader reader)
+/// <param name="reader"> The reader to base this on. </param>
+/// <remarks> This is not automatically written back to the original reader. If you want the new position written back, you need to assign it yourself. </remarks>
+public ref struct Utf8JsonObjectReader(scoped in Utf8JsonReader reader)
 {
     /// <summary> The depth of the current object. </summary>
     public readonly int ObjectDepth = reader.CurrentDepth;
 
+    ///  <summary> A copy of the reader at the current position. </summary>
+    public Utf8JsonReader Reader = reader;
+
     /// <summary> The type of the end token we use as stop. </summary>
-    public readonly JsonTokenType Type = reader.TokenType switch
+    public JsonTokenType Type { get; private set; } = reader.TokenType switch
     {
         JsonTokenType.StartArray  => JsonTokenType.EndArray,
         JsonTokenType.StartObject => JsonTokenType.EndObject,
@@ -1474,8 +1508,66 @@ public readonly ref struct Utf8JsonObjectReader(scoped in Utf8JsonReader reader)
     };
 
     /// <summary> Read until the end of the current value or object is reached. </summary>
-    /// <param name="reader"> The reader to use for reading (this should technically be stored, but can not be stored as a reference due to C# rules). </param>
     /// <returns> True if the current read still is inside the current object or array. </returns>
-    public bool Read(scoped ref Utf8JsonReader reader)
-        => Type is not JsonTokenType.None && reader.Read() && (reader.TokenType != Type || reader.CurrentDepth > ObjectDepth);
+    public bool Read()
+    {
+        if (Type is JsonTokenType.None)
+            return false;
+
+        if (!Reader.Read())
+            throw new JsonException("Invalid JSON: Object is not ended.");
+
+        if (Reader.TokenType != Type || Reader.CurrentDepth > ObjectDepth)
+            return true;
+
+        Type = JsonTokenType.None;
+        return false;
+    }
+}
+
+/// <summary> A helper struct to parse within a single property value or object. </summary>
+/// <param name="reader"> The reader to base this on. </param>
+/// <remarks> This does not copy the reader at the current location and can only be used with a referenced reader. </remarks>
+public ref struct Utf8JsonObjectLimit(scoped in Utf8JsonReader reader)
+{
+    /// <summary> The depth of the current object. </summary>
+    public readonly int ObjectDepth = reader.CurrentDepth;
+
+    /// <summary> The type of the end token we use as stop. </summary>
+    public JsonTokenType Type { get; private set; } = reader.TokenType switch
+    {
+        JsonTokenType.StartArray  => JsonTokenType.EndArray,
+        JsonTokenType.StartObject => JsonTokenType.EndObject,
+        JsonTokenType.Null        => JsonTokenType.None,
+        JsonTokenType.Number      => JsonTokenType.None,
+        JsonTokenType.String      => JsonTokenType.None,
+        JsonTokenType.True        => JsonTokenType.None,
+        JsonTokenType.False       => JsonTokenType.None,
+        _ => throw new JsonException(
+            $"{nameof(Utf8JsonObjectLimit)} needs to be initialized on a value token, {nameof(JsonTokenType.StartObject)} or a {nameof(JsonTokenType.StartArray)} token, but is at a {reader.TokenType}."),
+    };
+
+    /// <summary> Read until the end of the current value or object is reached. </summary>
+    /// <returns> True if the current read still is inside the current object or array. </returns>
+    public bool Read(ref Utf8JsonReader reader)
+    {
+        if (Type is JsonTokenType.None)
+            return false;
+
+        if (reader.TokenType == Type && reader.CurrentDepth == ObjectDepth)
+            return false;
+
+        if (!reader.Read())
+            throw new JsonException("Invalid JSON: Object is not ended.");
+
+        // This should not be able to happen?
+        if (reader.CurrentDepth < ObjectDepth)
+            throw new JsonException("Invalid JSON: Left object depth without ending it.");
+
+        if (reader.TokenType != Type || reader.CurrentDepth > ObjectDepth)
+            return true;
+
+        Type = JsonTokenType.None;
+        return false;
+    }
 }
