@@ -6,7 +6,7 @@ public sealed class SeparatorDeleteButton(BaseFileSystem fileSystem) : BaseButto
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label(in IFileSystemSeparator data)
-        => "Delete Separator"u8;
+        => "删除分隔符"u8;
 
     /// <inheritdoc/>
     public override void OnClick(in IFileSystemSeparator data)

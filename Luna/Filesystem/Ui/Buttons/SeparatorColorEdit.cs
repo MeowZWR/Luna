@@ -6,7 +6,7 @@ public sealed class SeparatorColorEdit(FileSystemDrawer drawer) : BaseButton<IFi
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label(in IFileSystemSeparator data)
-        => "Color Edits"u8;
+        => "颜色编辑"u8;
 
     /// <inheritdoc/>
     public override bool DrawMenuItem(in IFileSystemSeparator data)
@@ -19,13 +19,13 @@ public sealed class SeparatorColorEdit(FileSystemDrawer drawer) : BaseButton<IFi
             ret = true;
         }
 
-        Im.Tooltip.OnHover(isDefault ? "Use the custom color configured here."u8 : "Use the globally set color for the folder line."u8);
+        Im.Tooltip.OnHover(isDefault ? "使用此处配置的自定义颜色。"u8 : "使用全局设置的折叠组颜色。"u8);
 
         Im.Line.SameInner();
         using (Im.Disabled(isDefault))
         {
             var color = data.Color.Color?.ToVector() ?? lineColor;
-            if (Im.Color.Editor("Separator Color"u8, ref color, ColorEditorFlags.AlphaPreviewHalf | ColorEditorFlags.NoInputs))
+            if (Im.Color.Editor("分隔符颜色"u8, ref color, ColorEditorFlags.AlphaPreviewHalf | ColorEditorFlags.NoInputs))
             {
                 ret = true;
                 drawer.FileSystem.ChangeSeparator(data, color);

@@ -9,7 +9,7 @@ public sealed class SeparatorTimestampEdit(BaseFileSystem fileSystem) : BaseButt
 
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label(in IFileSystemSeparator data)
-        => "Timestamp Edit"u8;
+        => "时间戳编辑"u8;
 
     /// <inheritdoc/>
     public override bool DrawMenuItem(in IFileSystemSeparator data)
@@ -23,7 +23,7 @@ public sealed class SeparatorTimestampEdit(BaseFileSystem fileSystem) : BaseButt
             }
 
             Im.Item.SetNextWidthScaled(250);
-            Im.Input.Scalar("Sort Order Time"u8, ref _tempDate);
+            Im.Input.Scalar("排序时间"u8, ref _tempDate);
             if (Im.Item.Deactivated)
             {
                 if (Im.Item.DeactivatedAfterEdit)
@@ -47,7 +47,7 @@ public sealed class SeparatorTimestampEdit(BaseFileSystem fileSystem) : BaseButt
         }
 
         Im.Line.SameInner();
-        Im.Text("Sort Order Time"u8);
+        Im.Text("排序时间"u8);
         return false;
     }
 }

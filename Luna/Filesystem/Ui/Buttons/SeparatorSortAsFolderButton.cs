@@ -6,7 +6,7 @@ public sealed class SeparatorSortAsFolderButton(BaseFileSystem fileSystem) : Bas
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label(in IFileSystemSeparator data)
-        => data.BehavesLikeFolder ? "Sort As a Data Entry"u8 : "Sort As a Folder"u8;
+        => data.BehavesLikeFolder ? "按数据项排序"u8 : "按折叠组排序"u8;
 
     /// <inheritdoc/>
     public override void OnClick(in IFileSystemSeparator data)
