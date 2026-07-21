@@ -202,7 +202,7 @@ public sealed class Changelog : OverlayWindow
     /// <param name="width"></param>
     private void DrawUnderstoodButton(float width)
     {
-        if (!Im.Button("Understood"u8, new Vector2(width, 0)))
+        if (!Im.Button("已了解"u8, new Vector2(width, 0)))
             return;
 
         if (_lastVersion != _entries.Count)
