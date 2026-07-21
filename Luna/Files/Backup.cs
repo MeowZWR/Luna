@@ -8,7 +8,7 @@ public static partial class Backup
     public const int MaxNumBackups = 10;
 
     /// <summary> Create a backup named by ISO 8601 of the current time. </summary>
-    public static void CreatePermanentBackup(LunaLogger logger, DirectoryInfo dir, IReadOnlyCollection<FileInfo> files, string name,
+    public static void CreatePermanentBackup(LunaLogger logger, DirectoryInfo dir, IReadOnlyCollection<IBackupFile> files, string name,
         CancellationToken cancel = default)
         => CreateBackupInternal(logger, dir, files, name, cancel);
 
@@ -17,7 +17,7 @@ public static partial class Backup
     /// If the newest previously existing backup equals the current state of files, do not create a new backup. <br/>
     /// If the maximum number of backups is exceeded afterward, delete the oldest backup.
     /// </remarks>
-    public static void CreateAutomaticBackup(LunaLogger logger, DirectoryInfo dir, IReadOnlyCollection<FileInfo> files,
+    public static void CreateAutomaticBackup(LunaLogger logger, DirectoryInfo dir, IReadOnlyCollection<IBackupFile> files,
         CancellationToken cancel)
         => CreateBackupInternal(logger, dir, files, null, cancel);
 
@@ -70,7 +70,7 @@ public static partial class Backup
         return false;
     }
 
-    private static void CreateBackupInternal(LunaLogger logger, DirectoryInfo dir, IReadOnlyCollection<FileInfo> files, string? name,
+    private static void CreateBackupInternal(LunaLogger logger, DirectoryInfo dir, IReadOnlyCollection<IBackupFile> files, string? name,
         CancellationToken cancel)
     {
         try
@@ -82,9 +82,9 @@ public static partial class Backup
             {
                 var (newestFile, oldestFile, numFiles) = CheckExistingBackups(directory, cancel);
                 var newBackupName = Path.Combine(directory.FullName, $"{DateTime.Now:yyyyMMddHHmmss}.zip");
-                if (newestFile is null || CheckNewestBackup(logger, newestFile, configDirectory, files.Count, cancel))
+                if (newestFile is null || CheckNewestBackup(logger, newestFile, configDirectory, files, cancel))
                 {
-                    CreateBackupFile(files, newBackupName, configDirectory);
+                    CreateBackupFile(logger, files, newBackupName, configDirectory);
                     if (numFiles > MaxNumBackups)
                         oldestFile!.Delete();
                 }
@@ -95,7 +95,7 @@ public static partial class Backup
                 if (FormatRegex().IsMatch(fileName))
                     fileName = $"{name}-.zip";
                 var newBackupName = Path.Combine(directory.FullName, fileName);
-                CreateBackupFile(files, newBackupName, configDirectory);
+                CreateBackupFile(logger, files, newBackupName, configDirectory);
             }
         }
         catch (Exception e)
@@ -152,7 +152,7 @@ public static partial class Backup
     /// Compare the newest backup against the currently existing files.
     /// If there are any differences, return true, and if they are completely identical, return false.
     /// </summary>
-    private static bool CheckNewestBackup(LunaLogger logger, FileInfo newestFile, string configDirectory, int fileCount,
+    private static bool CheckNewestBackup(LunaLogger logger, FileInfo newestFile, string configDirectory, IReadOnlyCollection<IBackupFile> files,
         CancellationToken cancel)
     {
         try
@@ -160,22 +160,19 @@ public static partial class Backup
             using var oldFileStream = File.Open(newestFile.FullName, FileMode.Open);
             using var oldZip        = new ZipArchive(oldFileStream, ZipArchiveMode.Read);
             // Number of stored files is different.
-            if (fileCount != oldZip.Entries.Count)
+            if (files.Count != oldZip.Entries.Count)
                 return true;
 
-            // Since number of files is identical,
-            // the backups are identical if every file in the old backup
-            // still exists and is identical.
-            foreach (var entry in oldZip.Entries)
+            // Since number of files is identical, the backups are identical
+            // if every requested file exists in the old backup and is identical.
+            foreach (var file in files)
             {
-                var file = Path.Combine(configDirectory, entry.FullName);
-                if (!File.Exists(file))
+                var relativePath = Path.GetRelativePath(configDirectory, file.Path);
+                if (oldZip.GetEntry(relativePath) is not { } entry)
                     return true;
 
-                using var currentData = File.OpenRead(file);
-                using var oldData     = entry.Open();
-
-                if (!Equals(currentData, oldData))
+                using var oldData = entry.Open();
+                if (!file.Equals(oldData))
                     return true;
 
                 cancel.ThrowIfCancellationRequested();
@@ -195,29 +192,37 @@ public static partial class Backup
     }
 
     /// <summary> Create the actual backup, storing all the files relative to the given configDirectory in the zip. </summary>
-    private static void CreateBackupFile(IEnumerable<FileInfo> files, string fileName, string configDirectory)
+    /// <remarks> This writes a temporary file first and only moves it to the target location on success. When throwing, the temporary file should be deleted. </remarks>
+    private static void CreateBackupFile(LunaLogger logger, IEnumerable<IBackupFile> files, string fileName, string configDirectory)
     {
-        using var fileStream = File.Open(fileName, FileMode.Create);
-        using var zip        = new ZipArchive(fileStream, ZipArchiveMode.Create);
-        foreach (var file in files.Where(f => File.Exists(f.FullName)))
-            zip.CreateEntryFromFile(file.FullName, Path.GetRelativePath(configDirectory, file.FullName), CompressionLevel.Optimal);
-    }
-
-    /// <summary> Compare two streams per byte and return if they are equal. </summary>
-    [SkipLocalsInit]
-    private static unsafe bool Equals(Stream lhs, Stream rhs)
-    {
-        const int  bufferSize = 1024;
-        Span<byte> bufferLhs  = stackalloc byte[bufferSize];
-        Span<byte> bufferRhs  = stackalloc byte[bufferSize];
-        while (true)
+        var       tmpName    = fileName + ".tmp";
+        try
         {
-            var bytesLhs = lhs.ReadAtLeast(bufferLhs, bufferSize, false);
-            var bytesRhs = rhs.ReadAtLeast(bufferRhs, bufferSize, false);
-            if (bytesLhs != bytesRhs || !bufferLhs.SequenceEqual(bufferRhs))
-                return false;
-            if (bytesLhs < bufferSize)
-                return true;
+            if(File.Exists(tmpName))
+                File.Delete(tmpName);
+            using (var fileStream = File.Open(tmpName, FileMode.Create))
+            {
+                using var zip = new ZipArchive(fileStream, ZipArchiveMode.Create);
+                foreach (var file in files.Where(f => f.Exists))
+                    file.CreateEntry(zip, configDirectory);
+                fileStream.Flush(true);
+            }
+
+            File.Move(tmpName, fileName, true);
+        }
+        catch
+        {
+            try
+            {
+                if (File.Exists(tmpName))
+                    File.Delete(tmpName);
+            }
+            catch(Exception ex)
+            {
+                logger.Error($"Could not remove temporary backup archive after failure:\n{ex}");
+            }
+
+            throw;
         }
     }
 }

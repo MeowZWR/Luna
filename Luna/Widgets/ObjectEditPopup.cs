@@ -36,13 +36,32 @@ public abstract class ObjectEditPopup
             Im.Popup.Open(PopupId);
         }
 
-        using var popup = Im.Popup.Begin(PopupId);
-        if (popup)
-            DrawInternal();
+
+        PrePopup();
+        using (var popup = Begin())
+        {
+            if (popup)
+                DrawInternal();
+        }
+
+        PostPopup();
     }
+
+    /// <summary> Begin the popup. </summary>
+    /// <returns> The popup disposable. </returns>
+    protected virtual Im.PopupDisposable Begin()
+        => Im.Popup.Begin(PopupId);
 
     /// <summary> Draw the actual content of the popup. </summary>
     protected abstract void DrawInternal();
+
+    /// <summary> Actions to invoke before the popup is begun, e.g. setting its size. </summary>
+    protected virtual void PrePopup()
+    { }
+
+    /// <summary> Actions to invoke after the popup is ended, e.g. popping a window style. </summary>
+    protected virtual void PostPopup()
+    { }
 
     /// <summary> A helper for closing the popup. </summary>
     protected void Close()

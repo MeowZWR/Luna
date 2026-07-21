@@ -23,8 +23,8 @@ public static class JsonFunctions
     public static readonly JsonWriterOptions WriterOptions = new()
     {
         Indented        = true,
-        IndentCharacter = ' ',
-        IndentSize      = 4,
+        IndentCharacter = '\t',
+        IndentSize      = 1,
         NewLine         = "\n",
         Encoder         = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
@@ -294,10 +294,11 @@ public static class JsonFunctions
         /// <summary> Check whether the current property name token corresponds to the given property and has numerical value. </summary>
         /// <param name="propertyName"> The property name to check for. </param>
         /// <param name="value"> The parsed number on success. </param>
+        /// <param name="allowUnsignedNegative"> Whether to allow reading a negative number for unsigned values. </param>
         /// <returns> True if the property names correspond, false otherwise. </returns>
         /// <exception cref="JsonException"> If the property matches but has no following value token to read, or if the value token is not a number. </exception>
         [MethodImpl(ImSharpConfiguration.OptInl)]
-        public bool NumberProperty<TNumber>(ReadOnlySpan<byte> propertyName, out TNumber value)
+        public bool NumberProperty<TNumber>(ReadOnlySpan<byte> propertyName, out TNumber value, bool allowUnsignedNegative = false)
             where TNumber : unmanaged, INumber<TNumber>
         {
             Debug.Assert(reader.TokenType is JsonTokenType.PropertyName);
@@ -310,7 +311,7 @@ public static class JsonFunctions
             if (!reader.Read())
                 throw new JsonException($"Unexpected end after numeric property {Encoding.UTF8.GetString(propertyName)}.");
 
-            return reader.TryReadNumber(out value)
+            return reader.TryReadNumber(out value, default, allowUnsignedNegative)
                 ? true
                 : throw new JsonException(
                     $"Unexpected {reader.TokenType} value for numeric property {Encoding.UTF8.GetString(propertyName)}.");
@@ -319,10 +320,11 @@ public static class JsonFunctions
         /// <summary> Check whether the current property name token corresponds to the given property and has numerical value. </summary>
         /// <param name="propertyName"> The property name to check for. </param>
         /// <param name="value"> The parsed number on success. </param>
+        /// <param name="allowUnsignedNegative"> Whether to allow reading a negative number for unsigned values. </param>
         /// <returns> True if the property names correspond, false otherwise. </returns>
         /// <exception cref="JsonException"> If the property matches but has no following value token to read, or if the value token is not a number. </exception>
         [MethodImpl(ImSharpConfiguration.OptInl)]
-        public bool NumberProperty<TNumber>(ReadOnlySpan<byte> propertyName, out TNumber? value)
+        public bool NumberProperty<TNumber>(ReadOnlySpan<byte> propertyName, out TNumber? value, bool allowUnsignedNegative = false)
             where TNumber : unmanaged, INumber<TNumber>
         {
             Debug.Assert(reader.TokenType is JsonTokenType.PropertyName);
@@ -341,7 +343,7 @@ public static class JsonFunctions
                 return true;
             }
 
-            if (reader.TryReadNumber(out TNumber number))
+            if (reader.TryReadNumber(out TNumber number, default, allowUnsignedNegative))
             {
                 value = number;
                 return true;
@@ -761,69 +763,129 @@ public static class JsonFunctions
         /// <typeparam name="TNumber"> The type of number to read. </typeparam>
         /// <param name="number"> The return value on success, <paramref name="default"/> on failure. </param>
         /// <param name="default"> The default value to return if the number can not be read. </param>
+        /// <param name="allowUnsignedNegative"> Whether to allow reading a negative number for unsigned values. </param>
         /// <returns> True if the number was successfully read, false otherwise. </returns>
         /// <exception cref="ArgumentException"> If <typeparamref name="TNumber"/> is not one of the built-in integers or floats. </exception>
-        public bool TryReadNumber<TNumber>(out TNumber number, TNumber @default = default) where TNumber : unmanaged, INumber<TNumber>
+        public bool TryReadNumber<TNumber>(out TNumber number, TNumber @default = default, bool allowUnsignedNegative = false) where TNumber : unmanaged, INumber<TNumber>
         {
             // Read the actual number according to type.
             if (reader.TokenType is JsonTokenType.Number)
             {
-                if (typeof(TNumber) == typeof(byte) && reader.TryGetByte(out var b))
+                number = @default;
+                if (typeof(TNumber) == typeof(byte))
                 {
-                    number = Unsafe.As<byte, TNumber>(ref b);
+                    if (reader.TryGetByte(out var b))
+                    {
+                        number = Unsafe.As<byte, TNumber>(ref b);
+                        return true;
+                    }
+
+                    if (!allowUnsignedNegative || !reader.TryGetSByte(out var sb))
+                        return false;
+
+                    number = Unsafe.As<sbyte, TNumber>(ref sb);
                     return true;
+
                 }
 
-                if (typeof(TNumber) == typeof(sbyte) && reader.TryGetSByte(out var sb))
+                if (typeof(TNumber) == typeof(sbyte))
                 {
+                    if (!reader.TryGetSByte(out var sb))
+                        return false;
+
                     number = Unsafe.As<sbyte, TNumber>(ref sb);
                     return true;
                 }
 
-                if (typeof(TNumber) == typeof(ushort) && reader.TryGetUInt16(out var us))
+                if (typeof(TNumber) == typeof(ushort))
                 {
-                    number = Unsafe.As<ushort, TNumber>(ref us);
+                    if (reader.TryGetUInt16(out var b))
+                    {
+                        number = Unsafe.As<ushort, TNumber>(ref b);
+                        return true;
+                    }
+
+                    if (!allowUnsignedNegative || !reader.TryGetInt16(out var sb))
+                        return false;
+
+                    number = Unsafe.As<short, TNumber>(ref sb);
                     return true;
+
                 }
 
-                if (typeof(TNumber) == typeof(short) && reader.TryGetInt16(out var s))
+                if (typeof(TNumber) == typeof(short))
                 {
+                    if (!reader.TryGetInt16(out var s))
+                        return false;
+
                     number = Unsafe.As<short, TNumber>(ref s);
                     return true;
                 }
 
-                if (typeof(TNumber) == typeof(uint) && reader.TryGetUInt32(out var ui))
+                if (typeof(TNumber) == typeof(uint))
                 {
-                    number = Unsafe.As<uint, TNumber>(ref ui);
+                    if (reader.TryGetUInt32(out var b))
+                    {
+                        number = Unsafe.As<uint, TNumber>(ref b);
+                        return true;
+                    }
+
+                    if (!allowUnsignedNegative || !reader.TryGetInt32(out var sb))
+                        return false;
+
+                    number = Unsafe.As<int, TNumber>(ref sb);
                     return true;
+
                 }
 
-                if (typeof(TNumber) == typeof(int) && reader.TryGetInt32(out var i))
+                if (typeof(TNumber) == typeof(int))
                 {
+                    if (!reader.TryGetInt32(out var i))
+                        return false;
+
                     number = Unsafe.As<int, TNumber>(ref i);
                     return true;
                 }
 
-                if (typeof(TNumber) == typeof(ulong) && reader.TryGetUInt64(out var ul))
+                if (typeof(TNumber) == typeof(ulong))
                 {
-                    number = Unsafe.As<ulong, TNumber>(ref ul);
+                    if (reader.TryGetUInt64(out var b))
+                    {
+                        number = Unsafe.As<ulong, TNumber>(ref b);
+                        return true;
+                    }
+
+                    if (!allowUnsignedNegative || !reader.TryGetInt64(out var sb))
+                        return false;
+
+                    number = Unsafe.As<long, TNumber>(ref sb);
                     return true;
+
                 }
 
-                if (typeof(TNumber) == typeof(long) && reader.TryGetInt64(out var l))
+                if (typeof(TNumber) == typeof(long))
                 {
+                    if (!reader.TryGetInt64(out var l))
+                        return false;
+
                     number = Unsafe.As<long, TNumber>(ref l);
                     return true;
                 }
 
-                if (typeof(TNumber) == typeof(float) && reader.TryGetSingle(out var f))
+                if (typeof(TNumber) == typeof(float))
                 {
+                    if (!reader.TryGetSingle(out var f))
+                        return false;
+
                     number = Unsafe.As<float, TNumber>(ref f);
                     return true;
                 }
 
-                if (typeof(TNumber) == typeof(double) && reader.TryGetDouble(out var d))
+                if (typeof(TNumber) == typeof(double))
                 {
+                    if (!reader.TryGetDouble(out var d))
+                        return false;
+
                     number = Unsafe.As<double, TNumber>(ref d);
                     return true;
                 }

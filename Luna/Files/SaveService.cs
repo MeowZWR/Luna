@@ -9,7 +9,7 @@ public enum BackupMode
     /// <summary> Any file that is deleted or would be overwritten is moved to [filename].[extension].bak. This file is overwritten if it exists. </summary>
     SingleBackup = 1,
 
-    /// <summary> Any file that is deleted or would be overwritten is moved to [filename]_[yyyyMMddhhmmss].[extension].bak. These files are overwritten should it exist. </summary>
+    /// <summary> Any file that is deleted or would be overwritten is moved to [filename]_[yyyyMMddHHmmssfff].[extension].bak. These files are overwritten if a collision occurs. </summary>
     TimestampedBackup = 2,
 }
 
@@ -28,7 +28,7 @@ public class BaseSaveService(LunaLogger log, FrameworkManager framework)
     /// <summary> Whether this save service should back up files before deleting or overwriting them, and in what way. </summary>
     public BackupMode BackupMode { get; init; } = BackupMode.TimestampedBackup;
 
-    /// <summary> The number of backup files for a specific file type that are kept at once in <see cref="BackupMode.TimestampedBackup"/> mode. </summary>
+    /// <summary> The number of backup files to keep per original file in <see cref="BackupMode.TimestampedBackup"/> mode. </summary>
     /// <remarks> If this is <see cref="int.MaxValue"/> or less than 1 it is treated as unlimited. </remarks>
     public int BackupLimit { get; set; } = 3;
 
@@ -38,9 +38,9 @@ public class BaseSaveService(LunaLogger log, FrameworkManager framework)
     /// <summary> The framework event handler to use. </summary>
     protected readonly FrameworkManager Framework = framework;
 
-    /// <inheritdoc cref="WriteWithBackup(LunaLogger,string,Action{string},BackupMode,int)"/>
-    public void WriteWithBackup(string filePath, Action<string> writeFile)
-        => WriteWithBackup(Log, filePath, writeFile, BackupMode, BackupLimit);
+    /// <inheritdoc cref="AtomicWriteWithBackup(LunaLogger,string,Action{string},BackupMode,int)"/>
+    public void AtomicWriteWithBackup(string filePath, Action<string> writeFile)
+        => AtomicWriteWithBackup(Log, filePath, writeFile, BackupMode, BackupLimit);
 
     /// <inheritdoc cref="DeleteWithBackup(LunaLogger,string,BackupMode,int)"/>
     public void DeleteWithBackup(string filePath)
@@ -102,8 +102,11 @@ public class BaseSaveService(LunaLogger log, FrameworkManager framework)
         try
         {
             log.Information($"{threadPrefix}Deleting {filePath}...");
-            if (CreateBackup(log, mode, backupLimit, threadPrefix, "file", filePath, filePath, out var backup) && backup is not null)
+            // NoBackups deletes the file, while it is moved in CreateBackup and thus does not need to be deleted.
+            if (mode is BackupMode.NoBackups)
                 File.Delete(filePath);
+            else
+                CreateBackup(log, mode, backupLimit, threadPrefix, "file", filePath, filePath, out _);
         }
         catch (Exception ex)
         {
@@ -117,14 +120,15 @@ public class BaseSaveService(LunaLogger log, FrameworkManager framework)
     /// <param name="writeFile"> The function that writes the file. </param>
     /// <param name="mode"> The backup mode to use. </param>
     /// <param name="backupLimit"> The number of backups of this file to keep if using <see cref="BackupMode.TimestampedBackup"/>. Older backups will be deleted when this is surpassed. </param>
-    public static void WriteWithBackup(LunaLogger log, string filePath, Action<string> writeFile,
+    /// <remarks> The delegate must fully write and flush the temporary file if durability against process or system failure is required. </remarks>
+    public static void AtomicWriteWithBackup(LunaLogger log, string filePath, Action<string> writeFile,
         BackupMode mode = BackupMode.TimestampedBackup, int backupLimit = 3)
     {
         if (filePath.Length is 0)
             throw new ArgumentException($"{filePath} can not be empty.", nameof(filePath));
 
         var exists       = File.Exists(filePath);
-        var tmpPath      = exists ? Path.ChangeExtension(filePath, ".tmp") : filePath;
+        var tmpPath      = GetTempPath(filePath);
         var threadPrefix = GetThreadPrefix();
 
         // Write the recovered data first to a temporary file.
@@ -138,7 +142,7 @@ public class BaseSaveService(LunaLogger log, FrameworkManager framework)
             if (!exists)
             {
                 directory = Path.GetDirectoryName(tmpPath);
-                if (directory is not null)
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 {
                     Directory.CreateDirectory(directory);
                     directoryCreated = true;
@@ -149,9 +153,17 @@ public class BaseSaveService(LunaLogger log, FrameworkManager framework)
         }
         catch (Exception ex)
         {
-            log.Error(exists
-                ? $"{threadPrefix}Failed to write temporary file {tmpPath}:\n{ex}"
-                : $"{threadPrefix}Failed to write file {tmpPath}:\n{ex}");
+            log.Error($"{threadPrefix}Failed to write temporary file {tmpPath}:\n{ex}");
+            if (File.Exists(tmpPath))
+                try
+                {
+                    File.Delete(tmpPath);
+                }
+                catch (Exception ex2)
+                {
+                    log.Error($"{threadPrefix}Failed to delete temporary file {tmpPath} after failure to write file:\n{ex2}");
+                }
+
             if (!directoryCreated)
                 return;
 
@@ -167,82 +179,25 @@ public class BaseSaveService(LunaLogger log, FrameworkManager framework)
             return;
         }
 
-        // If the file did not exist beforehand, we do not need to create backups or move files.
-        if (!exists)
-            return;
-
-        // Then move the existing data to a backup, if expected.
-        var backupPath = GetBackupName(mode, filePath);
-        if (backupPath is not null)
+        if (exists)
         {
-            log.Information($"{threadPrefix}Moving {filePath} to backup at {backupPath}...");
-            try
-            {
-                File.Move(filePath, backupPath, true);
-            }
-            catch (Exception e)
-            {
-                log.Error($"{threadPrefix}Failed to move {filePath} to backup:\n{e}");
-                try
-                {
-                    File.Delete(tmpPath);
-                }
-                catch (Exception e2)
-                {
-                    log.Error($"{threadPrefix}Failed to delete temporary file {tmpPath} after failing to create backup:\n{e2}");
-                    return;
-                }
-            }
+            // Then move the existing data to a backup, if expected.
+            // For stability, we use a guaranteed backup path for File.Replace, then delete if no backup should be kept.
+            var backupPath       = GetBackupName(mode, filePath);
+            var actualBackupPath = backupPath ?? filePath + $"_temp_{Guid.NewGuid():N}.bak";
+            if (ReplaceSafely(log, tmpPath, filePath, actualBackupPath, threadPrefix, backupPath is null))
+                CleanBackups(log, mode, backupLimit, threadPrefix, filePath);
         }
-
-        try
+        else
         {
-            // Then move the temporary file to the actual file path.
-            // This may only overwrite if we have no backups.
-            File.Move(tmpPath, filePath, mode is BackupMode.NoBackups);
+            MoveSafely(log, tmpPath, filePath, threadPrefix);
         }
-        catch (Exception e3)
-        {
-            log.Error($"{threadPrefix}Failed to move temporary file {tmpPath} to {filePath}:\n{e3}");
-            // On failures, try to clean up the temporary file and move the backup back. Neither of those should generally happen.
-            if (backupPath is not null)
-                try
-                {
-                    log.Debug(
-                        $"{threadPrefix}Moving created backup {backupPath} back to {filePath} after failure to move temporary file {tmpPath}...");
-                    File.Move(backupPath, filePath, true);
-                }
-                catch (Exception e4)
-                {
-                    log.Error($"{threadPrefix}Failed to move backup {backupPath} back to {filePath}:\n{e4}");
-                }
-
-            try
-            {
-                File.Delete(tmpPath);
-            }
-            catch (Exception e5)
-            {
-                log.Error($"{threadPrefix}Failed to delete temporary file {tmpPath} after failure to move it:\n{e5}");
-            }
-        }
-
-        CleanBackups(log, mode, backupLimit, threadPrefix, filePath);
     }
 
-    /// <summary> Move a file to its backup location. </summary>
-    /// <param name="log"> The logger to use. </param>
-    /// <param name="mode"> The backup mode to use. If this is <see cref="BackupMode.NoBackups"/>, this just returns true. </param>
-    /// <param name="keptBackups"> The number of concurrent backups of a specific file to keep. </param>
-    /// <param name="threadPrefix"> The thread prefix for the log. </param>
-    /// <param name="typeName"> The name of the backed up object type. </param>
-    /// <param name="logName"> The name of the backed up value for logging. </param>
-    /// <param name="name"> The full original file path of the backed up file. </param>
-    /// <param name="backupName"> The path the backed up file is moved to on success, <c>null</c> if <see cref="BackupMode.NoBackups"/> is used. </param>
+
     /// <returns> True if <see cref="BackupMode.NoBackups"/> is used or the backup was successful, false otherwise. </returns>
     protected static bool CreateBackup(LunaLogger log, BackupMode mode, int keptBackups, string threadPrefix, string typeName, string logName,
-        string name,
-        out string? backupName)
+        string name, out string? backupName)
     {
         backupName = GetBackupName(mode, name);
         if (backupName is null)
@@ -252,6 +207,7 @@ public class BaseSaveService(LunaLogger log, FrameworkManager framework)
         {
             log.Debug($"{threadPrefix}Backing up existing {typeName} {logName}...");
             File.Move(name, backupName, true);
+            CleanBackups(log, mode, keptBackups, threadPrefix, name);
             return true;
         }
         catch (Exception ex)
@@ -263,7 +219,7 @@ public class BaseSaveService(LunaLogger log, FrameworkManager framework)
 
     /// <summary> Clean all older timestamped backup files if there are too many. </summary>
     /// <param name="log"> The logger to use. </param>
-    /// <param name="mode"> The backup mode to use. If this is <see cref="BackupMode.NoBackups"/>, this just returns true. </param>
+    /// <param name="mode"> The backup mode to use. If this is <see cref="BackupMode.NoBackups"/>, nothing is done. </param>
     /// <param name="keptBackups"> The number of concurrent backups of a specific file to keep. </param>
     /// <param name="threadPrefix"> The thread prefix for the log. </param>
     /// <param name="name"> The full original file path of the backed up file. </param>
@@ -275,15 +231,19 @@ public class BaseSaveService(LunaLogger log, FrameworkManager framework)
         if (keptBackups is int.MaxValue or <= 0)
             return;
 
-        var directory = Path.GetDirectoryName(name)!;
-        var pattern   = $"{Path.GetFileNameWithoutExtension(name.AsSpan())}_*{Path.GetExtension(name.AsSpan())}.bak";
-        var files     = Directory.EnumerateFiles(directory, pattern, SearchOption.TopDirectoryOnly).Order().ToList();
-        if (files.Count <= keptBackups)
+        var directory = Path.GetDirectoryName(name);
+        if (string.IsNullOrEmpty(directory))
+            directory = ".";
+
+        var pattern = $"{Path.GetFileNameWithoutExtension(name.AsSpan())}_*{Path.GetExtension(name.AsSpan())}.bak";
+        var files   = Directory.EnumerateFiles(directory, pattern, SearchOption.TopDirectoryOnly).Order(StringComparer.Ordinal).ToList();
+        var cleanup = files.Count - keptBackups;
+        if (cleanup <= 0)
             return;
 
         log.Debug(
-            $"{threadPrefix}Found {files.Count} backups for {name} with {keptBackups} backups to be kept, cleaning up {files.Count - keptBackups}...");
-        foreach (var file in files.Take(keptBackups))
+            $"{threadPrefix}Found {files.Count} backups for {name} with {keptBackups} backups to be kept, cleaning up {cleanup}...");
+        foreach (var file in files.Take(cleanup))
         {
             try
             {
@@ -296,26 +256,110 @@ public class BaseSaveService(LunaLogger log, FrameworkManager framework)
         }
     }
 
+    /// <summary> Atomically replace the file at <paramref name="targetPath"/> with <paramref name="tmpPath"/>, while writing it to <paramref name="actualBackupPath"/>. </summary>
+    /// <param name="log"> The logger to use. </param>
+    /// <param name="tmpPath"> The path to the temporary file supposed to overwrite the target. </param>
+    /// <param name="targetPath"> The path to the target to be overwritten. </param>
+    /// <param name="actualBackupPath"> The path to a backup file the target is moved to. </param>
+    /// <param name="threadPrefix"> The thread prefix for the logger. </param>
+    /// <param name="temporary"> Whether the <paramref name="actualBackupPath"/> should be deleted after successful replacement. </param>
+    /// <returns> True if the file was successfully replaced. </returns>
+    /// <remarks>
+    ///   If the backup is temporary and the deletion fails, this will be logged but still return true as the replacement was successful. <br/>
+    ///   If the replacement fails, this will try to delete the temporary file and log this, regardless of success or error.
+    /// </remarks>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected static bool ReplaceSafely(LunaLogger log, string tmpPath, string targetPath, string actualBackupPath, string threadPrefix,
+        bool temporary)
+    {
+        log.Debug(
+            $"{threadPrefix}Replacing {targetPath} with {tmpPath}, using {(temporary ? "temporary" : "permanent")} backup at {actualBackupPath}...");
+        try
+        {
+            File.Replace(tmpPath, targetPath, actualBackupPath, true);
+            if (!temporary)
+                return true;
+
+            try
+            {
+                File.Delete(actualBackupPath);
+            }
+            catch (Exception ex)
+            {
+                log.Error($"{threadPrefix}Failed to delete temporary backup {actualBackupPath} after file replacement:\n{ex}");
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            log.Error($"{threadPrefix}Failed to replace {targetPath} with {tmpPath}:\n{ex}");
+            try
+            {
+                File.Delete(tmpPath);
+            }
+            catch (Exception e2)
+            {
+                log.Error($"{threadPrefix}Failed to delete temporary file {tmpPath} after failing to replace {targetPath}:\n{e2}");
+            }
+
+            return false;
+        }
+    }
+
+    /// <summary> Move a temporary file to its non-existent destination. </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected static bool MoveSafely(LunaLogger log, string tmpPath, string filePath, string threadPrefix)
+    {
+        try
+        {
+            File.Move(tmpPath, filePath, false);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            log.Error($"{threadPrefix}Failed to move temporary file {tmpPath} to first-time target {filePath}:\n{ex}");
+            try
+            {
+                File.Delete(tmpPath);
+            }
+            catch (Exception ex2)
+            {
+                log.Error($"{threadPrefix}Failed to delete temporary file {tmpPath} after failing to move it to target {filePath}:\n{ex2}");
+            }
+        }
+
+        return false;
+    }
+
     /// <summary> Get the log prefix of the current thread ID. </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected static string GetThreadPrefix()
         => $"[{Environment.CurrentManagedThreadId}] ";
 
     /// <summary> Get the appropriate name for a backup file given a file path and the backup mode. </summary>
-    private static string? GetBackupName(BackupMode mode, string original)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected static string? GetBackupName(BackupMode mode, string original)
         => mode switch
         {
             BackupMode.NoBackups         => null,
             BackupMode.SingleBackup      => original + ".bak",
             BackupMode.TimestampedBackup => GetTimeBackup(original),
-            _                            => null,
+            _                            => throw new ArgumentOutOfRangeException(nameof(mode), mode, null),
         };
 
-    private static string GetTimeBackup(string original)
+    /// <summary> Create a temporary file path for a given path. </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected static string GetTempPath(string path)
+        => $"{path}_{Guid.NewGuid():N}.tmp";
+
+    /// <summary> Get a backup path with the current timestamp. </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected static string GetTimeBackup(string original)
     {
         var extension = Path.GetExtension(original.AsSpan());
         var path      = original.AsSpan(0, original.Length - extension.Length);
-        return $"{path}_{DateTime.Now:yyyyMMddhhmmss}{extension}.bak";
+        return $"{path}_{DateTime.UtcNow:yyyyMMddHHmmssfff}{extension}.bak";
     }
 }
 
@@ -357,6 +401,8 @@ public abstract class BaseSaveService<T>(LunaLogger log, FrameworkManager framew
             case SaveType.ImmediateSync:
                 ImmediateSaveSync(value);
                 return;
+            case SaveType.None: return;
+            default:            throw new ArgumentOutOfRangeException(nameof(type), type, null);
         }
     }
 
@@ -384,24 +430,27 @@ public abstract class BaseSaveService<T>(LunaLogger log, FrameworkManager framew
 
     /// <inheritdoc/>
     public void Dispose()
-    {
-        GC.SuppressFinalize(this);
-        Dispose(true);
-    }
+        => Flush();
 
-    /// <summary> Dispose by waiting for the save task to finish. </summary>
-    /// <param name="disposing"> Whether this is called from <see cref="Dispose"/> or a finalizer. </param>
-    protected virtual void Dispose(bool disposing)
+    /// <summary> Flush all currently queued saves. </summary>
+    /// <remarks> Save and delete actions must not synchronously call back into this service. </remarks>
+    public virtual void Flush()
     {
         lock (_saveTaskLock)
         {
-            _saveTask?.Wait();
+            try
+            {
+                _saveTask?.Wait();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Failure in the save task:\n{ex}");
+                throw;
+            }
+
             _saveTask = null;
         }
     }
-
-    ~BaseSaveService()
-        => Dispose(false);
 
     /// <summary> Immediately trigger a save on the service's save thread. </summary>
     /// <param name="value"> The file to save. </param>
@@ -424,73 +473,53 @@ public abstract class BaseSaveService<T>(LunaLogger log, FrameworkManager framew
             var logName      = value.LogName(name);
             var typeName     = value.TypeName;
             var threadPrefix = GetThreadPrefix();
+            var tmpPath      = GetTempPath(name);
+            var createdFile  = false;
             try
             {
                 if (name.Length is 0)
                     throw new Exception("Invalid object returned empty filename.");
 
-                // Check if the file written to already exists, and if it does, write to a temporary file first.
                 var fileExisted = File.Exists(name);
-
                 Log.Debug($"{threadPrefix}Saving {typeName} {logName} {(fileExisted ? "using secure write" : "for the first time")}...");
-                var firstName = fileExisted ? name + ".tmp" : name;
-                var file      = new FileInfo(firstName);
+                var file = new FileInfo(tmpPath);
 
                 // Create all required directories to write the file.
                 file.Directory?.Create();
 
                 // Open the new or temporary file as a stream and write to it.
-                using (var s = file.Exists ? file.Open(FileMode.Truncate) : file.Open(FileMode.CreateNew))
+                using (var s = file.Open(FileMode.CreateNew))
                 {
+                    createdFile = true;
                     value.Save(s);
+                    s.Flush(true);
                 }
 
-                // If we wrote to a temporary file, move the fully written file to replace the original file when done.
                 if (fileExisted)
                 {
-                    if (!CreateBackup(Log, BackupMode, BackupLimit, threadPrefix, typeName, logName, name, out var backup))
-                        try
-                        {
-                            File.Delete(firstName);
-                        }
-                        catch (Exception e)
-                        {
-                            Log.Error($"{threadPrefix}Could not delete temporary file {firstName} after failure to create backup:\n{e}");
-                        }
-                    else
-                        try
-                        {
-                            File.Move(file.FullName, name, true);
-                        }
-                        catch (Exception e)
-                        {
-                            Log.Error($"{threadPrefix}Could not move temporary file {firstName} to {name} after writing backup:\n{e}");
-                            if (backup is not null)
-                                try
-                                {
-                                    File.Move(backup, name, true);
-                                }
-                                catch (Exception e2)
-                                {
-                                    Log.Error(
-                                        $"{threadPrefix}Could not move backup file {backup} back to {name} after failing to move temporary file:\n{e2}");
-                                }
-
-                            try
-                            {
-                                File.Delete(firstName);
-                            }
-                            catch (Exception e2)
-                            {
-                                Log.Error(
-                                    $"{threadPrefix}Could not delete temporary file {firstName} after failing to move it to {name}:\n{e2}");
-                            }
-                        }
+                    // If we wrote to a temporary file, move the fully written file to replace the original file when done.
+                    var backupPath       = GetBackupName(BackupMode, name);
+                    var actualBackupPath = backupPath ?? name + $"_temp_{Guid.NewGuid():N}.bak";
+                    if (ReplaceSafely(Log, tmpPath, name, actualBackupPath, threadPrefix, backupPath is null))
+                        CleanBackups(Log, BackupMode, BackupLimit, threadPrefix, name);
+                }
+                else
+                {
+                    MoveSafely(Log, tmpPath, name, threadPrefix);
                 }
             }
             catch (Exception ex)
             {
                 Log.Error($"{threadPrefix}Could not save {typeName} {logName}:\n{ex}");
+                if (createdFile && File.Exists(tmpPath))
+                    try
+                    {
+                        File.Delete(tmpPath);
+                    }
+                    catch (Exception ex2)
+                    {
+                        Log.Error($"{threadPrefix}Could not delete temporary {typeName} file after failing to save:\n{ex2}");
+                    }
             }
         }
     }
@@ -501,10 +530,7 @@ public abstract class BaseSaveService<T>(LunaLogger log, FrameworkManager framew
     public void ImmediateSaveSync<TSavable>(in TSavable value) where TSavable : ISavable<T>
     {
         ImmediateSave(value);
-        lock (_saveTaskLock)
-        {
-            _saveTask?.Wait();
-        }
+        Flush();
     }
 
     /// <summary> Immediately delete a file on the service's file thread. </summary>
@@ -553,9 +579,6 @@ public abstract class BaseSaveService<T>(LunaLogger log, FrameworkManager framew
     public void ImmediateDeleteSync<TSavable>(in TSavable value) where TSavable : ISavable<T>
     {
         ImmediateDelete(value);
-        lock (_saveTaskLock)
-        {
-            _saveTask?.Wait();
-        }
+        Flush();
     }
 }
