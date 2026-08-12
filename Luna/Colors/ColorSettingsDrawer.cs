@@ -17,13 +17,13 @@ public static class ColorSettingsDrawer
         where TColorId : unmanaged, Enum
         where TColorData : IColorData<TColorId>
     {
-        if (Im.Button("Copy to Clipboard"u8))
+        if (Im.Button("复制到剪贴板"u8))
             Im.Clipboard.Set(dict.Sharable(true));
 
         Im.Line.Same();
         var ret = DrawImportButtons(messages, dict);
         Im.Line.Same();
-        if (ImEx.Button("Reset All to Default"u8, default, "Reset all color values to their default colors."u8,
+        if (ImEx.Button("全部重置为默认值"u8, default, "重置所有颜色值为默认值。"u8,
                 !LunaStyle.Modifier.Destructive))
             ret |= dict.ResetToDefault();
         LunaStyle.Modifier.Destructive.TooltipLineBreak("reset"u8);
@@ -41,7 +41,7 @@ public static class ColorSettingsDrawer
         foreach (var (index, (category, colors)) in drawCache.Sections.Index())
         {
             using var id   = Im.Id.Push(index);
-            using var tree = Im.Tree.Node(category.IsEmpty ? "General"u8 : category, TreeNodeFlags.DefaultOpen);
+            using var tree = Im.Tree.Node(category.IsEmpty ? "通用"u8 : category, TreeNodeFlags.DefaultOpen);
             if (!tree)
                 continue;
 
@@ -83,7 +83,7 @@ public static class ColorSettingsDrawer
 
         // Draw a button to return to default.
         Im.Line.SameInner();
-        if (ImEx.Button("Default"u8, Vector2.Zero, StringU8.Empty, setValue.IsDefault))
+        if (ImEx.Button("默认"u8, Vector2.Zero, StringU8.Empty, setValue.IsDefault))
         {
             dict.Remove(id);
             ret = true;
@@ -99,12 +99,12 @@ public static class ColorSettingsDrawer
         if (setValue.Type is not ColorDataUnion.TypeEnum.Const and not ColorDataUnion.TypeEnum.Default)
         {
             Im.Line.SameInner();
-            Im.TextDisabled($"(Custom Reference to {setValue.ToStringU8<TColorId>(TColorData.Parent)})");
+            Im.TextDisabled($"(自定义引用为 {setValue.ToStringU8<TColorId>(TColorData.Parent)})");
         }
         else if (setValue.Type is ColorDataUnion.TypeEnum.Default && data.Default.Type is not ColorDataUnion.TypeEnum.Const)
         {
             Im.Line.SameInner();
-            Im.TextDisabled($"(Default Reference to {data.Default.ToStringU8<TColorId>(TColorData.Parent)})");
+            Im.TextDisabled($"(默认引用为 {data.Default.ToStringU8<TColorId>(TColorData.Parent)})");
         }
 
         return ret;
@@ -120,24 +120,24 @@ public static class ColorSettingsDrawer
         {
             case ColorDataUnion.TypeEnum.Const:
                 current = colorData.Default.ConstantValue.ToVector();
-                ImEx.TextFrameAligned($"Reset this color to {colorData.Default.ConstantValue}.");
+                ImEx.TextFrameAligned($"重置此颜色为 {colorData.Default.ConstantValue}。");
                 break;
             case ColorDataUnion.TypeEnum.Self:
                 var parent      = TColorData.Data(colorData.Default.SelfValue<TColorId>());
                 var parentValue = cache[colorData.Default.SelfValue<TColorId>()];
                 current = cache[colorData.Default.SelfValue<TColorId>(), true];
                 ImEx.TextFrameAligned(
-                    $"Reset this color to a reference to {TColorData.Parent} color <{parent.Label}> (currently {parentValue}).");
+                    $"重置此颜色为 {TColorData.Parent} 颜色 <{parent.Label}> (当前为 {parentValue})。");
                 break;
             case ColorDataUnion.TypeEnum.ImGui:
                 current = cache[colorData.Default.ImGuiValue, true];
                 ImEx.TextFrameAligned(
-                    $"Reset this color to a reference to ImGui color <{Im.Color.GetNameOwned(colorData.Default.ImGuiValue)}> (currently {cache[colorData.Default.ImGuiValue]}).");
+                    $"重置此颜色为 ImGui 颜色 <{Im.Color.GetNameOwned(colorData.Default.ImGuiValue)}> (当前为 {cache[colorData.Default.ImGuiValue]})。");
                 break;
             case ColorDataUnion.TypeEnum.Dalamud:
                 current = cache[colorData.Default.DalamudValue, true];
                 ImEx.TextFrameAligned(
-                    $"Reset this color to a reference to Dalamud color <{colorData.Default.DalamudValue.StringU8}> (currently {cache[colorData.Default.DalamudValue]}).");
+                    $"重置此颜色为 Dalamud 颜色 <{colorData.Default.DalamudValue.StringU8}> (当前为 {cache[colorData.Default.DalamudValue]})。");
                 break;
             default: throw new Exception("Unknown Color Type");
         }
@@ -150,15 +150,15 @@ public static class ColorSettingsDrawer
         where TColorId : unmanaged, Enum
         where TColorData : IColorData<TColorId>
     {
-        var ignoreDefaults = ImEx.Button("Import From Clipboard (Ignore Defaults)"u8,
+        var ignoreDefaults = ImEx.Button("从剪贴板导入 (忽略默认值)"u8,
             default,
-            "Try to import exported color values from your clipboard, but do not reset any values you have already set if the import contains their default values."u8,
+            "尝试从剪贴板导入导出的颜色值，若导入项为默认值，则不覆盖已修改的数值。"u8,
             !LunaStyle.Modifier.Misclick);
         LunaStyle.Modifier.Misclick.TooltipLineBreak("import"u8);
 
         Im.Line.Same();
-        var applyDefaults = ImEx.Button("Import From Clipboard (Write Defaults)"u8, default,
-            "Try to import exported color values from your clipboard, overwriting everything."u8, !LunaStyle.Modifier.Misclick);
+        var applyDefaults = ImEx.Button("从剪贴板导入 (覆盖所有)"u8, default,
+            "尝试从剪贴板导入颜色值，覆盖所有已设置的值。"u8, !LunaStyle.Modifier.Misclick);
         LunaStyle.Modifier.Misclick.TooltipLineBreak("import"u8);
 
         if (!ignoreDefaults && !applyDefaults)
@@ -169,11 +169,11 @@ public static class ColorSettingsDrawer
             if (ColorDictionary<TColorId, TColorData>.FromSharable(Im.Clipboard.Get(), true) is { } parsedDict)
                 return dict.Apply(parsedDict, applyDefaults);
 
-            throw new Exception("Unable to parse color dictionary from clipboard.");
+            throw new Exception("无法从剪贴板解析颜色字典。");
         }
         catch (Exception ex)
         {
-            messages.NotificationMessage(ex, "Failed to import color dictionary", NotificationType.Error, false);
+            messages.NotificationMessage(ex, "导入颜色字典失败", NotificationType.Error, false);
         }
 
         return false;
@@ -209,7 +209,7 @@ public static class ColorSettingsDrawer
 
                     break;
                 case ColorDataUnion.TypeEnum.ImGui:
-                    if (_imGui.Draw("##imgui"u8, input.ImGuiValue, "Choose a reference to an ImGui color."u8, comboWidth, out var newImGui))
+                    if (_imGui.Draw("##imgui"u8, input.ImGuiValue, "选择一个 ImGui 颜色引用。"u8, comboWidth, out var newImGui))
                     {
                         output = new ColorDataUnion(newImGui);
                         ret    = true;
@@ -217,7 +217,7 @@ public static class ColorSettingsDrawer
 
                     break;
                 case ColorDataUnion.TypeEnum.ImNodes:
-                    if (_imNodes.Draw("##imNodes"u8, input.ImNodesValue, "Choose a reference to an ImNodes color."u8, comboWidth,
+                    if (_imNodes.Draw("##imNodes"u8, input.ImNodesValue, "选择一个 ImNodes 颜色引用。"u8, comboWidth,
                             out var newImNodes))
                     {
                         output = new ColorDataUnion(newImNodes);
@@ -226,7 +226,7 @@ public static class ColorSettingsDrawer
 
                     break;
                 case ColorDataUnion.TypeEnum.Dalamud:
-                    if (_dalamud.Draw("##dalamud"u8, input.DalamudValue, "Choose a reference to a Dalamud color."u8, comboWidth,
+                    if (_dalamud.Draw("##dalamud"u8, input.DalamudValue, "选择一个 Dalamud 颜色引用。"u8, comboWidth,
                             out var newDalamud))
                     {
                         output = new ColorDataUnion(newDalamud);
@@ -235,7 +235,7 @@ public static class ColorSettingsDrawer
 
                     break;
                 case ColorDataUnion.TypeEnum.Luna:
-                    if (_luna.Draw("##luna"u8, input.LunaValue, "Choose a reference to a Luna color."u8, comboWidth, out var newLuna))
+                    if (_luna.Draw("##luna"u8, input.LunaValue, "选择一个 Luna 颜色引用。"u8, comboWidth, out var newLuna))
                     {
                         output = new ColorDataUnion(newLuna);
                         ret    = true;
