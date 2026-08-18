@@ -73,7 +73,7 @@ public static class KeySelector
             using var indent = Im.Indent();
             Im.Item.SetNextWidth(width - indent.CurrentIndent);
             changes |= Modifier("额外组合键"u8,
-                "设置另一个可选的修饰键，与第一个修饰键一起使用以触发组合键。"u8,
+                "设置另一个可选的组合键，与第一个组合键一起使用以触发组合键。"u8,
                 currentValue.Modifier2, k => copy.SetModifier2(k));
         }
 
@@ -108,14 +108,14 @@ public static class KeySelector
             using var indent = Im.Indent();
             width -= indent.CurrentIndent;
             Im.Item.SetNextWidth(width);
-            changes |= Modifier("修饰键"u8,     "设置一个可选的修饰键，与选定的热键一起使用以触发组合键。"u8,
+            changes |= Modifier("组合键"u8,     "设置一个可选的组合键，与选定的热键一起使用以触发组合键。"u8,
                 currentValue.Modifiers.Modifier1, k => copy.SetModifier1(k));
 
             if (currentValue.Modifiers.Modifier1 != ModifierHotkey.NoKey)
             {
                 Im.Item.SetNextWidth(width);
                 changes |= Modifier("额外组合键"u8,
-                    "设置另一个可选的修饰键，与选定的热键和第一个修饰键一起使用。"u8,
+                    "设置另一个可选的组合键，与选定的热键和第一个组合键一起使用。"u8,
                     currentValue.Modifiers.Modifier2, k => copy.SetModifier2(k));
             }
         }
