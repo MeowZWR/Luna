@@ -7,7 +7,7 @@ public static class SupportButton
 {
     private const string InternationalDiscordAddress = "https://discord.gg/kVva7DHV4r";
     private const string ChineseDiscordAddress       = "https://discord.gg/QvrVye3";
-    private const string GuideAddress                = "https://reniguide.info/";
+    private const string GuideAddress                = "https://reniguide.carrd.co/";
     private const string XivModArchiveAddress        = "https://www.xivmodarchive.com/";
     private const string HeliosphereAddress          = "https://heliosphere.app/";
 
@@ -80,8 +80,8 @@ public static class SupportButton
             .Push(ImGuiColor.ButtonHovered, LunaStyle.ReniColorHovered)
             .Push(ImGuiColor.ButtonActive,  LunaStyle.ReniColorActive);
 
-        Link(message, "新手指南"u8, "https://reniguide.info/", width,
-            "访问 https://reniguide.info/\n由 Serenity 制作的包含 Penumbra 大部分功能的图片和文字教程（英文）。\n"u8
+        Link(message, "新手指南"u8, "https://reniguide.carrd.co/", width,
+            "访问 https://reniguide.carrd.co/\n由 Serenity 制作的包含 Penumbra 大部分功能的图片和文字教程（英文）。\n"u8
           + "非官方指南，但通常不会过时。"u8);
     }
 

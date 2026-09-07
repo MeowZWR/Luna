@@ -43,6 +43,10 @@ public class BaseFileSystem
     public IFileSystemFolder Root
         => _root;
 
+    /// <summary> Whether the file system has a folder named '.' at root. </summary>
+    public bool HasDotObject
+        => _root.Children.Any(c => c.Name is ".");
+
     /// <summary> Change the lock state of an item and invoke a change for it if it actually changes. </summary>
     /// <returns> True on change, false if nothing changed. </returns>
     public bool ChangeLockState(IFileSystemNode node, bool value)
@@ -235,6 +239,21 @@ public class BaseFileSystem
         return (node, idx);
     }
 
+    /// <summary> Change the associated display name of a folder. </summary>
+    /// <param name="node"> The folder node. If this is not a folder, nothing is done. </param>
+    /// <param name="newDisplayName"> The new display name. If this is the same as before, nothing is done. Empty names are not permitted and treated as null/default. </param>
+    public void ChangeFolderDisplayName(IFileSystemNode node, string? newDisplayName)
+    {
+        if (newDisplayName?.Length is 0)
+            newDisplayName = null;
+
+        if (node is not FileSystemFolder folder || folder.DisplayName == newDisplayName)
+            return;
+
+        folder.DisplayName = newDisplayName;
+        Changed.Invoke(new FileSystemChanged.Arguments(FileSystemChangeType.FolderChanged, node, null, null));
+    }
+
     /// <summary> Change the associated color of an expanded folder. </summary>
     /// <param name="node"> The folder node. If this is not a folder, nothing is done. </param>
     /// <param name="color"> The new color. If this is the same as before, nothing is done. </param>
@@ -256,6 +275,18 @@ public class BaseFileSystem
             return;
 
         folder.CollapsedColor = color;
+        Changed.Invoke(new FileSystemChanged.Arguments(FileSystemChangeType.FolderChanged, node, null, null));
+    }
+
+    /// <summary> Change the associated color of a folder line. </summary>
+    /// <param name="node"> The folder node. If this is not a folder, nothing is done. </param>
+    /// <param name="color"> The new color. If this is the same as before, nothing is done. </param>
+    public void ChangeFolderLineColor(IFileSystemNode node, ColorParameter color)
+    {
+        if (node is not FileSystemFolder folder || folder.LineColor == color)
+            return;
+
+        folder.LineColor = color;
         Changed.Invoke(new FileSystemChanged.Arguments(FileSystemChangeType.FolderChanged, node, null, null));
     }
 

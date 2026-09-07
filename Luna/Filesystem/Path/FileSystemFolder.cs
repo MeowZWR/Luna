@@ -6,6 +6,9 @@ internal sealed class FileSystemFolder(FileSystemIdentifier identifier)
     : FileSystemNode(identifier), IFileSystemFolder
 {
     /// <inheritdoc/>
+    public string? DisplayName { get; internal set; }
+
+    /// <inheritdoc/>
     public int TotalDescendants { get; internal set; }
 
     /// <inheritdoc/>
@@ -16,6 +19,9 @@ internal sealed class FileSystemFolder(FileSystemIdentifier identifier)
 
     /// <inheritdoc/>
     public ColorParameter CollapsedColor { get; internal set; }
+
+    /// <inheritdoc/>
+    public ColorParameter LineColor { get; internal set; }
 
     /// <inheritdoc/>
     public ISortMode? SortMode { get; internal set; }
@@ -68,6 +74,7 @@ internal sealed class FileSystemFolder(FileSystemIdentifier identifier)
         if (newDepth == Depth)
             return;
 
+        Depth = newDepth;
         // Also update all descendants.
         foreach (var desc in GetDescendants())
             desc.UpdateDepth();
