@@ -16,7 +16,7 @@ public class Tutorial
     public Vector4 BorderColor { get; init; } = new Rgba32(0xD00000FF).ToVector();
 
     /// <summary> The label used for the tutorial popup. </summary>
-    public StringU8 PopupLabel { get; init; } = new("Tutorial"u8);
+    public StringU8 PopupLabel { get; init; } = new("教程"u8);
 
     /// <summary> The list of all steps. </summary>
     private readonly List<Step> _steps = [];
@@ -149,7 +149,7 @@ public class Tutorial
 
         ImEx.TextFrameAligned(step.Name);
         Im.Line.Same(Im.ContentRegion.Available.X - Im.Style.TextHeight);
-        int? nextValue = ImEx.Icon.Button(LunaStyle.NextIcon, "Go to next tutorial step."u8)
+        int? nextValue = ImEx.Icon.Button(LunaStyle.NextIcon, "前往下一步教程。"u8)
             ? next
             : null;
 
@@ -168,14 +168,14 @@ public class Tutorial
         }
 
         Im.Line.New();
-        var buttonText = next == EndStep ? "Finish"u8 : "Next"u8;
+        var buttonText = next == EndStep ? "完成"u8 : "下一步"u8;
         nextValue = Im.Button(buttonText) ? next : nextValue;
         Im.Line.Same();
-        nextValue = Im.Button("Skip Tutorial"u8) ? EndStep : nextValue;
-        Im.Tooltip.OnHover("Skip all current tutorial entries, but show any new ones added later."u8);
+        nextValue = Im.Button("跳过教程"u8) ? EndStep : nextValue;
+        Im.Tooltip.OnHover("跳过当前所有教程，之后新增的仍会显示。"u8);
         Im.Line.Same();
-        nextValue = Im.Button("Disable Tutorial"u8) ? -1 : nextValue;
-        Im.Tooltip.OnHover("Disable all tutorial entries."u8);
+        nextValue = Im.Button("关闭教程"u8) ? -1 : nextValue;
+        Im.Tooltip.OnHover("关闭所有教程。"u8);
 
         if (nextValue is not null)
         {
