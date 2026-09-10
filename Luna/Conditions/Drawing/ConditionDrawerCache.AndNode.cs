@@ -18,7 +18,7 @@ public abstract partial class ConditionDrawerCache<TContext>
     {
         /// <inheritdoc/>
         protected override ReadOnlySpan<byte> Text
-            => "And"u8;
+            => "与"u8;
 
         /// <inheritdoc/>
         public override Rgba32 TitleColor(ConditionDrawerCache<TContext> drawerCache)
@@ -42,14 +42,14 @@ public abstract partial class ConditionDrawerCache<TContext>
             // Flip And/Or button.
             Im.Line.NoSpacing();
             if (ImEx.Icon.ButtonCorners(LunaStyle.SwitchIcon, Parent is ParentConditionType.Not ? Corners.BottomRight : Corners.None,
-                    "Turn this entire And-Condition into an Or-Condition while keeping its input. This may merge it with its parent Or-Condition."u8,
+                    "将整个「与」条件转为「或」条件，并保留其输入。这可能会与其父级「或」条件合并。"u8,
                     !LunaStyle.Modifier.Misclick, Parent is ParentConditionType.Not ? reducedButton : buttonSize))
             {
                 Setter(new OrCondition<TContext>((IReadOnlyList<ICondition<TContext>>)Condition).Reduce());
                 ret = true;
             }
 
-            LunaStyle.Modifier.Misclick.TooltipLineBreak("flip"u8);
+            LunaStyle.Modifier.Misclick.TooltipLineBreak("切换"u8);
 
             ret |= NegateButton(drawerCache, Condition, reducedButton);
             return ret;

@@ -89,7 +89,7 @@ public abstract partial class ConditionDrawerCache<TContext>(TContext context)
     /// <returns> True if a new condition was created and set. </returns>
     protected virtual bool DrawAddRootConditionButton(RootNode root, ConditionDrawerCache<TContext> drawerCache, ImSharp.ImNodes.Node node, Vector2 buttonSize)
     {
-        if (!ImEx.Icon.ButtonCorners(LunaStyle.AddObjectIcon, Corners.Bottom, "Set a condition for this object."u8, false, buttonSize)
+        if (!ImEx.Icon.ButtonCorners(LunaStyle.AddObjectIcon, Corners.Bottom, "为此对象设置条件。"u8, false, buttonSize)
          || drawerCache.CreateNewCondition() is not { } condition)
             return false;
 
@@ -125,7 +125,7 @@ public abstract partial class ConditionDrawerCache<TContext>(TContext context)
         RootNodeSize      = new Vector2(3 * ButtonSize.X,                         nodeHeight);
         NotNodeSize       = new Vector2(2 * ButtonSize.X,                         nodeHeight);
         ConnectorNodeSize = new Vector2(4 * ButtonSize.X,                         nodeHeight);
-        ConstantNodeSize  = new Vector2(Im.Font.CalculateButtonSize("False"u8).X, nodeHeight);
+        ConstantNodeSize  = new Vector2(Math.Max(Im.Font.CalculateButtonSize("假"u8).X, 2 * ButtonSize.X), nodeHeight);
         NodeSpacing       = ButtonSize with { X = nodeHeight };
         OnUpdate();
 

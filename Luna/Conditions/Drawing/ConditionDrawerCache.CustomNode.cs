@@ -41,7 +41,7 @@ public abstract partial class ConditionDrawerCache<TContext>
             Corners corners = Corners.None)
         {
             if (!ImEx.Icon.ButtonCorners(FontAwesomeIcon.UserTimes.Icon(), corners,
-                    "Replace this with an And-condition of this with a new condition. This may be reduced for simplicity."u8,
+                    "将此条件与一个新条件组成「与」条件。可能会被简化合并。"u8,
                     false, buttonSize)
              || drawerCache.CreateNewCondition() is not { } condition)
                 return false;
@@ -60,7 +60,7 @@ public abstract partial class ConditionDrawerCache<TContext>
             Corners corners = Corners.None)
         {
             if (!ImEx.Icon.ButtonCorners(FontAwesomeIcon.UserPlus.Icon(), corners,
-                    "Replace this with an Or-condition of this with a new condition. This may be reduced for simplicity."u8,
+                    "将此条件与一个新条件组成「或」条件。可能会被简化合并。"u8,
                     false, buttonSize)
              || drawerCache.CreateNewCondition() is not { } condition)
                 return false;

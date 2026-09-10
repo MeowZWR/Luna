@@ -42,7 +42,7 @@ public abstract partial class ConditionDrawerCache<TContext>
             DrawOutputConnector(node, drawerCache.ConnectorNodeSize, Output);
             using (node.TitleBar())
             {
-                ImEx.TextFramed(Value ? "True"u8 : "False"u8, drawerCache.ConstantNodeSize with { Y = drawerCache.ButtonSize.Y },
+                ImEx.TextFramed(Value ? "真"u8 : "假"u8, drawerCache.ConstantNodeSize with { Y = drawerCache.ButtonSize.Y },
                     Rgba32.Transparent);
             }
 
@@ -51,7 +51,7 @@ public abstract partial class ConditionDrawerCache<TContext>
             var ret        = DeleteConditionButton(drawerCache, false, buttonSize);
             Im.Line.NoSpacing();
             if (ImEx.Icon.ButtonCorners(Value ? LunaStyle.NegateIcon : LunaStyle.RemoveNegateIcon, Corners.BottomRight,
-                    "Flip this constant condition."u8, true, buttonSize))
+                    "翻转此恒定条件。"u8, true, buttonSize))
             {
                 Setter(Value ? FalseCondition<TContext>.Instance : TrueCondition<TContext>.Instance);
                 ret = true;

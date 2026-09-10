@@ -75,7 +75,7 @@ public abstract partial class ConditionDrawerCache<TContext>
         /// <returns> Whether a new condition was added. </returns>
         protected bool AddConditionButton(ConditionDrawerCache<TContext> drawerCache, Vector2 buttonSize)
         {
-            if (ImEx.Icon.ButtonCorners(LunaStyle.AddObjectIcon, Corners.None, "Add a new condition to this condition group."u8, false,
+            if (ImEx.Icon.ButtonCorners(LunaStyle.AddObjectIcon, Corners.None, "向此条件组添加新条件。"u8, false,
                     buttonSize)
              && drawerCache.CreateNewCondition() is { } newCondition)
             {

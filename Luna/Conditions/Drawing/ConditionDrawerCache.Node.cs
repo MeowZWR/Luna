@@ -118,7 +118,7 @@ public abstract partial class ConditionDrawerCache<TContext>
         {
             var ret      = false;
             var disabled = input && !LunaStyle.Modifier.Destructive;
-            if (ImEx.Icon.ButtonCorners(LunaStyle.DeleteIcon, corners, "Delete this condition and everything connected to its input."u8,
+            if (ImEx.Icon.ButtonCorners(LunaStyle.DeleteIcon, corners, "删除此条件及其输入端连接的全部内容。"u8,
                     disabled, buttonSize))
             {
                 Setter(null);
@@ -126,7 +126,7 @@ public abstract partial class ConditionDrawerCache<TContext>
             }
 
             if (disabled)
-                LunaStyle.Modifier.Destructive.TooltipLineBreak("delete"u8);
+                LunaStyle.Modifier.Destructive.TooltipLineBreak("删除"u8);
 
             return ret;
         }
@@ -145,7 +145,7 @@ public abstract partial class ConditionDrawerCache<TContext>
                 return false;
 
             Im.Line.NoSpacing();
-            if (ImEx.Icon.ButtonCorners(LunaStyle.NegateIcon, corners, "Negate this condition by making it the child of a Not-condition."u8,
+            if (ImEx.Icon.ButtonCorners(LunaStyle.NegateIcon, corners, "对此条件取反（将其放入「非」条件下）。"u8,
                     false, buttonSize))
             {
                 Setter(new NotCondition<TContext>(condition).Reduce());

@@ -31,7 +31,7 @@ public abstract partial class ConditionDrawerCache<TContext>
             // Draw The root title.
             using (node.TitleBar())
             {
-                ImEx.TextFramed("Condition"u8, drawerCache.RootNodeSize with { Y = drawerCache.ButtonSize.Y }, Rgba32.Transparent);
+                ImEx.TextFramed("条件"u8, drawerCache.RootNodeSize with { Y = drawerCache.ButtonSize.Y }, Rgba32.Transparent);
             }
 
             // Draw either the 'Add Condition'-button or the 'Delete all conditions'-button.
@@ -45,14 +45,14 @@ public abstract partial class ConditionDrawerCache<TContext>
             }
             else
             {
-                if (ImEx.Icon.ButtonCorners(LunaStyle.DeleteIcon, Corners.Bottom, "Delete the entire condition for this object."u8,
+                if (ImEx.Icon.ButtonCorners(LunaStyle.DeleteIcon, Corners.Bottom, "删除此对象的全部条件。"u8,
                         !LunaStyle.Modifier.Destructive, buttonSize))
                 {
                     Setter(null);
                     ret = true;
                 }
 
-                LunaStyle.Modifier.Destructive.TooltipLineBreak("delete"u8);
+                LunaStyle.Modifier.Destructive.TooltipLineBreak("删除"u8);
             }
 
             return ret;

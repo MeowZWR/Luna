@@ -40,7 +40,7 @@ public abstract partial class ConditionDrawerCache<TContext>
     {
         /// <inheritdoc/>
         protected override ReadOnlySpan<byte> Text
-            => "Not"u8;
+            => "非"u8;
 
         /// <inheritdoc/>
         public override Rgba32 TitleColor(ConditionDrawerCache<TContext> drawerCache)
@@ -61,7 +61,7 @@ public abstract partial class ConditionDrawerCache<TContext>
             var ret = DeleteConditionButton(drawerCache, true, buttonSize);
             // Un-negate button
             Im.Line.NoSpacing();
-            if (ImEx.Icon.ButtonCorners(LunaStyle.RemoveNegateIcon, Corners.BottomRight, "Remove the negation from this child's condition."u8,
+            if (ImEx.Icon.ButtonCorners(LunaStyle.RemoveNegateIcon, Corners.BottomRight, "移除此子条件上的取反。"u8,
                     false, buttonSize))
             {
                 Setter(((NotCondition<TContext>)Condition).Condition.Reduce());
