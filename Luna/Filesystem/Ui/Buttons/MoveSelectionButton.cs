@@ -6,7 +6,7 @@ public sealed class MoveSelectionButton(BaseFileSystem fileSystem) : BaseButton<
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label(in IFileSystemFolder _)
-        => "Move Selection Here"u8;
+        => "将选中项移动到此处"u8;
 
     /// <inheritdoc/>
     public override bool Enabled(in IFileSystemFolder data)
@@ -29,8 +29,8 @@ public sealed class MoveSelectionButton(BaseFileSystem fileSystem) : BaseButton<
     /// <inheritdoc/>
     public override void DrawTooltip(in IFileSystemFolder _)
     {
-        Im.Text("Move your current selection into this folder if possible. Ancestors of this folder are ignored."u8);
+        Im.Text("尽可能将当前选中项移动到此折叠组。其上级折叠组会被忽略。"u8);
         if (!LunaStyle.Modifier.Misclick)
-            Im.Text($"\nHold {LunaStyle.Modifier.Misclick} while clicking to dissolve.");
+            Im.Text($"\n按住 {LunaStyle.Modifier.Misclick} 点击以移动。");
     }
 }

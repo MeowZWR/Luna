@@ -6,7 +6,7 @@ public sealed class CreateSubFolderButton(BaseFileSystem fileSystem) : BaseButto
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label(in IFileSystemFolder _)
-        => "Create Subfolder here"u8;
+        => "在此创建子组"u8;
 
     /// <inheritdoc/>
     public override void OnClick(in IFileSystemFolder folder)
@@ -18,13 +18,13 @@ public sealed class CreateSubFolderButton(BaseFileSystem fileSystem) : BaseButto
 
     /// <inheritdoc/>
     public override void DrawTooltip(in IFileSystemFolder _)
-        => Im.Text("Create a new empty folder that is a subfolder of this one. Can contain '/' to create multiple nested subfolders."u8);
+        => Im.Text("在此新建一个空白子组。可以包含 '/' 来创建多个嵌套子组。"u8);
 
     /// <inheritdoc/>
     protected override void PostDraw(in IFileSystemFolder parentFolder)
     {
         // Handle the actual popup.
-        if (!InputPopup.OpenName($"CSF{parentFolder.Identifier.Value}", "Enter Subfolder Name..."u8, out var newName))
+        if (!InputPopup.OpenName($"CSF{parentFolder.Identifier.Value}", "输入子组名称..."u8, out var newName))
             return;
 
         try

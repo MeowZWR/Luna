@@ -174,10 +174,10 @@ public sealed class FileSystemSelectorContextMenu(FileSystemSelectorPanel parent
     public sealed class DissolveFolder : BaseButton<FolderButtonData>
     {
         public override ReadOnlySpan<byte> Label(in FolderButtonData _)
-            => "Dissolve Folder"u8;
+            => "解散组"u8;
 
         public override void DrawTooltip(in FolderButtonData _)
-            => Im.Text("Remove this folder and move all its children to its parent-folder, if possible."u8);
+            => Im.Text("尝试移除此组并将所有子组移动到其上级组。"u8);
 
         public override bool HasTooltip
             => true;
@@ -200,7 +200,7 @@ public sealed class FileSystemSelectorContextMenu(FileSystemSelectorPanel parent
         public override bool DrawMenuItem(in FolderButtonData data)
         {
             var currentPath = data.Folder.FullPath;
-            var ret         = Im.Input.Text("##Rename"u8, ref currentPath, "Folder Path..."u8, InputTextFlags.EnterReturnsTrue);
+            var ret         = Im.Input.Text("##Rename"u8, ref currentPath, "组路径..."u8, InputTextFlags.EnterReturnsTrue);
             if (ret)
             {
                 // TODO: do in actions outside of iteration.
@@ -210,7 +210,7 @@ public sealed class FileSystemSelectorContextMenu(FileSystemSelectorPanel parent
             }
 
 
-            Im.Tooltip.OnHover("Enter a full path here to move or rename the folder. Creates all required parent directories, if possible."u8);
+            Im.Tooltip.OnHover("输入一个完整路径以移动或重命名组。如果符合条件，自动创建所有必需的父目录。"u8);
             return ret;
         }
     }
@@ -218,11 +218,11 @@ public sealed class FileSystemSelectorContextMenu(FileSystemSelectorPanel parent
     public sealed class SetFolderLocked : BaseButton<FolderButtonData>
     {
         public override ReadOnlySpan<byte> Label(in FolderButtonData data)
-            => data.Folder.Locked ? "Unlock"u8 : "Lock"u8;
+            => data.Folder.Locked ? "解锁"u8 : "锁定"u8;
 
         public override void DrawTooltip(in FolderButtonData _)
             => Im.Text(
-                "Locking an item prevents this item from being dragged to other positions. It does not prevent any other manipulations of the item."u8);
+                "锁定一个组会阻止该组的拖动。不阻止对该组的其他操作。"u8);
 
         public override bool HasTooltip
             => true;
@@ -234,11 +234,11 @@ public sealed class FileSystemSelectorContextMenu(FileSystemSelectorPanel parent
     public sealed class SetDataLocked : BaseButton<DataButtonData>
     {
         public override ReadOnlySpan<byte> Label(in DataButtonData data)
-            => data.Data.Locked ? "Unlock"u8 : "Lock"u8;
+            => data.Data.Locked ? "解锁"u8 : "锁定"u8;
 
         public override void DrawTooltip(in DataButtonData _)
             => Im.Text(
-                "Locking an item prevents this item from being dragged to other positions. It does not prevent any other manipulations of the item."u8);
+                "锁定一个组会阻止该组的拖动。不阻止对该组的其他操作。"u8);
 
         public override bool HasTooltip
             => true;
@@ -257,8 +257,8 @@ public sealed class FileSystemSelectorContextMenu(FileSystemSelectorPanel parent
             var currentPath = data.Data.FullPath;
             if (Im.Window.Appearing)
                 Im.Keyboard.SetFocusHere();
-            Im.Text("Rename Search Path or Move:"u8);
-            var ret = Im.Input.Text("##RenameSearch"u8, ref currentPath, "Search Path..."u8, InputTextFlags.EnterReturnsTrue);
+            Im.Text("重命名搜索路径或移动:"u8);
+            var ret = Im.Input.Text("##RenameSearch"u8, ref currentPath, "搜索路径..."u8, InputTextFlags.EnterReturnsTrue);
             if (ret)
             {
                 // TODO: do in actions outside of iteration.
@@ -268,7 +268,7 @@ public sealed class FileSystemSelectorContextMenu(FileSystemSelectorPanel parent
             }
 
             Im.Tooltip.OnHover(
-                "Enter a full path here to move or rename the search path of the leaf. Creates all required parent directories, if possible.\n\nDoes NOT rename the actual data!"u8);
+                "输入一个完整路径以移动或重命名搜索路径。如果符合条件，自动创建所有必需的父目录。\n\n不会重命名实际数据！"u8);
             return ret;
         }
     }
