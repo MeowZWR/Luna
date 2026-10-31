@@ -27,13 +27,13 @@ public class GlobalSortModeSelector(FileSystemDrawer drawer, Action<ISortMode>? 
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label
-        => "Global Sort Mode"u8;
+        => "全局排序"u8;
 
     /// <inheritdoc/>
     public override bool DrawMenuItem()
     {
         LunaStyle.DrawSeparator();
-        Im.Text("Global Sorting:"u8);
+        Im.Text("全局排序"u8);
         if (!SortModeCombo.DrawCombo(drawer.ValidSortModes, "##sortCombo"u8, drawer.SortMode, out var newSortMode, false,
                 180 * Im.Style.GlobalScale))
             return false;
