@@ -43,13 +43,13 @@ public sealed class FolderColorEdits(FileSystemDrawer drawer) : BaseButton<IFile
         if (ImEx.IconCheckbox("##defLine"u8, LunaStyle.LockedIcon, data.LineColor.IsDefault, out isDefault))
             drawer.FileSystem.ChangeFolderLineColor(data, isDefault ? ColorParameter.Default : lineColor);
 
-        Im.Tooltip.OnHover(isDefault ? "Use the custom color configured here."u8 : "Use the globally set color for folder lines."u8);
+        Im.Tooltip.OnHover(isDefault ? "使用此处配置的自定义颜色。"u8 : "使用全局设置的折叠组线颜色。"u8);
 
         Im.Line.SameInner();
         using (Im.Disabled(isDefault))
         {
             var color = data.LineColor.Color?.ToVector() ?? lineColor;
-            if (Im.Color.Editor("Folder Line Color"u8, ref color, ColorEditorFlags.AlphaPreviewHalf | ColorEditorFlags.NoInputs))
+            if (Im.Color.Editor("折叠组线颜色"u8, ref color, ColorEditorFlags.AlphaPreviewHalf | ColorEditorFlags.NoInputs))
                 drawer.FileSystem.ChangeFolderLineColor(data, color);
         }
 

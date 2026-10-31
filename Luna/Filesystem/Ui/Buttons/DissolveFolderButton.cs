@@ -38,14 +38,14 @@ public sealed class DissolveAllFoldersButton(BaseFileSystem fileSystem) : BaseBu
 {
     /// <inheritdoc/>
     public override ReadOnlySpan<byte> Label(in IFileSystemFolder _)
-        => "Dissolve All Descendant Folders"u8;
+        => "解除所有折叠组"u8;
 
     /// <inheritdoc/>
     public override void DrawTooltip(in IFileSystemFolder _)
     {
-        Im.Text("Remove all descendant folders of this folder and move their flattened children into this folder, if possible."u8);
+        Im.Text("删除这个折叠组及其所有子折叠组，并将它们的子组移动到其父组中（如果有父组的话）。"u8);
         if (!LunaStyle.Modifier.Destructive)
-            Im.Text($"\nHold {LunaStyle.Modifier.Destructive} while clicking to dissolve.");
+            Im.Text($"\n按住 {LunaStyle.Modifier.Destructive} 并单击以解除所有折叠组。");
     }
 
     /// <inheritdoc/>
